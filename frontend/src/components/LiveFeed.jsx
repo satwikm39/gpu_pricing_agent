@@ -24,7 +24,7 @@ const LiveFeed = ({ data }) => {
     const formatMoney = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
     return (
-        <div className={`bg-slate-800/40 border-l-[6px] ${getBorderColor()} rounded-r-xl rounded-l-sm p-5 flex flex-col gap-4 animate-fade-in hover:bg-slate-800/60 transition-colors`}>
+        <div className={`glass-card bg-slate-800/20 border-l-[6px] ${getBorderColor()} rounded-r-xl rounded-l-sm p-6 flex flex-col gap-5 animate-fade-in hover:bg-slate-800/40 transition-colors`}>
             {/* Header */}
             <div className="flex justify-between items-start">
                 <div>
@@ -53,39 +53,39 @@ const LiveFeed = ({ data }) => {
                             </span>
                         )}
                     </div>
-                    <h3 className="text-xl font-semibold text-white mt-1.5">
+                    <h3 className="text-2xl font-display font-bold text-white mt-3 flex items-center gap-3">
                         {request.quantity}x {request.workload_type}
-                        <span className="text-slate-400 font-normal ml-2">({request.duration_hours}h req)</span>
+                        <span className="text-slate-400 font-sans font-normal text-sm tracking-wider uppercase">({request.duration_hours}h req)</span>
                     </h3>
                 </div>
                 <div className="text-right flex flex-col items-end">
-                    <div className={`px-4 py-1.5 rounded-full text-xs font-bold border ${getBadgeColor()} uppercase tracking-widest shadow-lg`}>
+                    <div className={`px-5 py-2 rounded-lg text-sm font-display font-bold border ${getBadgeColor()} uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(0,0,0,0.2)] backdrop-blur-sm`}>
                         {decision.action}
                     </div>
                 </div>
             </div>
-            <div className={`flex justify-between items-center py-2 mt-2 mb-2 bg-slate-900/40 rounded px-4 border border-dashed ${getBorderColor()}`}>
-                <span className={`font-semibold uppercase tracking-wider text-xs font-sans flex items-center gap-2 ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
+            <div className={`flex justify-between items-center py-3 mt-2 mb-2 bg-slate-900/60 rounded-xl px-5 border border-dashed hover:border-solid transition-all ${getBorderColor()} shadow-inner`}>
+                <span className={`font-display font-bold uppercase tracking-[0.1em] text-xs flex items-center gap-2 ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                     </svg>
                     Final Executed Price
                 </span>
-                <span className={`font-bold text-lg ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
-                    ${decision.final_price_per_hour.toFixed(2)} /hr
+                <span className={`font-mono font-bold text-xl drop-shadow-md ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
+                    ${decision.final_price_per_hour.toFixed(2)} <span className="text-sm text-slate-500 opacity-80">/hr</span>
                 </span>
             </div>
 
             {/* Glass Box Explanation */}
-            <div className="bg-slate-900/60 p-5 rounded-lg border border-slate-700/50 relative overflow-hidden group hover:border-accent-500/40 transition-colors shadow-inner">
-                <div className="absolute top-0 left-0 w-1.5 h-full bg-accent-500/60"></div>
-                <div className="text-xs text-accent-400 font-bold tracking-widest uppercase mb-3 flex items-center gap-2">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="bg-slate-900/40 p-6 rounded-xl border border-white/5 relative overflow-hidden group hover:border-accent-500/30 transition-colors shadow-inner mt-1">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-accent-500/50"></div>
+                <div className="text-[11px] text-accent-400 font-display font-bold tracking-[0.2em] uppercase mb-4 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                     </svg>
                     Glass-Box Explanation
                 </div>
-                <div className="text-slate-200 text-sm leading-relaxed antialiased font-light tracking-wide border-l-2 border-slate-600 pl-4 py-2 space-y-3">
+                <div className="text-slate-300 text-sm leading-relaxed antialiased font-light tracking-wide border-l-2 border-slate-700/50 pl-5 py-2 space-y-4">
                     {decision.explanation.split('\n').filter(line => line.trim()).map((line, i) => {
                         // Match "- **BoldText**: Rest of line"
                         const match = line.match(/^-\s*\*\*(.*?)\*\*:(.*)/);
@@ -107,13 +107,13 @@ const LiveFeed = ({ data }) => {
                                 <div key={i} className="flex gap-2 items-start">
                                     <span className="text-accent-400 mt-0.5">•</span>
                                     <div>
-                                        <span className="font-bold text-white tracking-wider uppercase text-xs mr-2">{matchNoBullet[1]}:</span>
+                                        <span className="font-bold text-white font-display tracking-[0.1em] uppercase text-xs mr-2">{matchNoBullet[1]}:</span>
                                         <span className="text-slate-300">{matchNoBullet[2]}</span>
                                     </div>
                                 </div>
                             );
                         }
-                        return <p key={i}>{line}</p>;
+                        return <p key={i} className="text-slate-300 leading-tall">{line}</p>;
                     })}
                 </div>
                 {decision.target_eviction_id && (

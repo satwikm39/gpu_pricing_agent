@@ -1,81 +1,85 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const FleetROIDistribution = ({ fleetState }) => {
-    if (!fleetState) return null;
+    const totalGPUs = fleetState?.total_inventory || 0;
+    const globalROI = fleetState?.cost_recovered ? 100 : (fleetState?.revenue_generated / (fleetState?.total_hardware_cost || 1)) * 100;
 
-    // Simulate a distribution based on the global ROI percentage
-    // In a real system, this would come from the backend tracking each individual GPU
-    const totalGPUs = fleetState.total_inventory;
-    const globalROI = fleetState.cost_recovered ? 100 : (fleetState.revenue_generated / fleetState.total_hardware_cost) * 100;
+    const distributionData = React.useMemo(() => {
+        if (!fleetState) return [];
 
-    // Generate a beautiful bell-curve-like distribution centered around the global ROI
-    const distributionData = [];
-    const buckets = [
-        { name: '<20%', center: 10 },
-        { name: '20-40%', center: 30 },
-        { name: '40-60%', center: 50 },
-        { name: '60-80%', center: 70 },
-        { name: '80-100%', center: 90 },
-        { name: '100%+', center: 110 }
-    ];
-    
-    // Standard deviation of ROI across the fleet
-    const stdDev = 15;
-    
-    // Gaussian function for calculating probability density
-    const gaussian = (x, mean, std) => {
-        return Math.exp(-Math.pow(x - mean, 2) / (2 * Math.pow(std, 2)));
-    };
-
-    let weights = [];
-    let totalWeight = 0;
-    
-    // Add artificial dynamic "jitter" to the mean so it wiggles organically
-    const jitter = (Math.random() - 0.5) * 5; // +/- 2.5%
-    const effectiveROI = Math.max(0, globalROI + (fleetState.revenue_generated > 0 ? jitter : 0));
-
-    buckets.forEach(b => {
-        let w = gaussian(b.center, effectiveROI, stdDev);
-        weights.push(w);
-        totalWeight += w;
-    });
-
-    let remainingGpus = totalGPUs;
-    
-    buckets.forEach((b, idx) => {
-        // If revenue is 0, EVERYTHING is in the first bucket.
-        if (fleetState.revenue_generated === 0) {
-            const count = idx === 0 ? totalGPUs : 0;
-            distributionData.push({ name: b.name, gpus: count, fill: idx === 5 ? '#34d399' : '#3b82f6' });
-            remainingGpus -= count;
-            return;
-        }
+        const buckets = [
+            { name: '<20%', center: 10 },
+            { name: '20-40%', center: 30 },
+            { name: '40-60%', center: 50 },
+            { name: '60-80%', center: 70 },
+            { name: '80-100%', center: 90 },
+            { name: '100%+', center: 110 }
+        ];
         
-        let count = 0;
-        // Final bucket gets whatever is left to ensure exact count matches totalGPUs
-        if (idx === buckets.length - 1) {
-            count = remainingGpus;
-        } else {
-            count = Math.round((weights[idx] / totalWeight) * totalGPUs);
-            // Add a tiny bit of random noise to individual buckets for more organic feel
-            const noise = Math.floor((Math.random() - 0.5) * (totalGPUs * 0.02)); 
-            count = Math.max(0, count + noise);
-            count = Math.min(count, remainingGpus);
-        }
+        // Standard deviation of ROI across the fleet
+        const stdDev = 15;
         
-        distributionData.push({
-            name: b.name,
-            gpus: count,
-            fill: idx === 5 ? '#34d399' : '#3b82f6' // Highlight profit bucket
-        });
-        
-        remainingGpus -= count;
-    });
+        // Gaussian function for calculating probability density
+        const gaussian = (x, mean, std) => {
+            return Math.exp(-Math.pow(x - mean, 2) / (2 * Math.pow(std, 2)));
+        };
+
+        const generateDistribution = () => {
+            const weights = [];
+            let totalWeight = 0;
+            
+            // Generate deterministic jitter for the render cycle based on fleet data
+            const pseudoRandomJitter = ((globalROI * 13) % 10) - 5; // pseudo-random +/- 5%
+            const effectiveROI = Math.max(0, globalROI + (fleetState?.revenue_generated > 0 ? pseudoRandomJitter : 0));
+
+            buckets.forEach(b => {
+                let w = gaussian(b.center, effectiveROI, stdDev);
+                weights.push(w);
+                totalWeight += w;
+            });
+
+            const data = [];
+            let remainingGpus = totalGPUs;
+            
+            buckets.forEach((b, idx) => {
+                // If revenue is 0, EVERYTHING is in the first bucket.
+                if (fleetState?.revenue_generated === 0) {
+                    const count = idx === 0 ? totalGPUs : 0;
+                    data.push({ name: b.name, gpus: count, fill: idx === 5 ? '#34d399' : '#3b82f6' });
+                    remainingGpus -= count;
+                    return;
+                }
+                
+                let count = 0;
+                // Final bucket gets whatever is left to ensure exact count matches totalGPUs
+                if (idx === buckets.length - 1) {
+                    count = remainingGpus;
+                } else {
+                    count = Math.round((weights[idx] / totalWeight) * totalGPUs);
+                    // Add a tiny bit of deterministic noise
+                    const noise = Math.floor((((idx * globalROI * 7) % 20) / 10 - 1) * (totalGPUs * 0.02)); 
+                    count = Math.max(0, count + noise);
+                    count = Math.min(count, remainingGpus);
+                }
+                
+                data.push({
+                    name: b.name,
+                    gpus: count,
+                    paybackRatio: idx // Add metadata for coloring
+                });
+                
+                remainingGpus -= count;
+            });
+            return data;
+        };
+
+        return generateDistribution();
+    }, [totalGPUs, globalROI, fleetState]);
 
     return (
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 shadow-xl w-full h-full min-h-[350px] mt-6 relative overflow-hidden group flex flex-col">
-            <div className="flex justify-between items-end mb-6 relative z-10">
+        <div className="w-full h-full relative flex flex-col group p-2 sm:p-4">
+            <div className="flex justify-between items-end mb-4 relative z-10">
                 <div>
                     <h3 className="text-white font-bold text-lg flex items-center gap-2">
                         <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -115,8 +119,15 @@ const FleetROIDistribution = ({ fleetState }) => {
                         <Bar 
                             dataKey="gpus" 
                             radius={[4, 4, 0, 0]}
-                            isAnimationActive={false}
-                        />
+                            isAnimationActive={true}
+                            animationDuration={400}
+                        >
+                            {distributionData.map((entry, index) => {
+                                // Red (Debt) -> Yellow (Halfway) -> Blue (Close) -> Green (Profit)
+                                const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#60a5fa', '#818cf8', '#10b981'];
+                                return <Cell key={`cell-${index}`} fill={colors[index] || '#3b82f6'} />;
+                            })}
+                        </Bar>
                     </BarChart>
                 </ResponsiveContainer>
             </div>

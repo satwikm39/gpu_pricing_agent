@@ -1,5 +1,5 @@
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const TimeSeriesChart = ({ data }) => {
     
@@ -7,11 +7,11 @@ const TimeSeriesChart = ({ data }) => {
     const formatMoney = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
     return (
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 shadow-xl w-full h-full min-h-[350px] mt-6 relative overflow-hidden group flex flex-col">
+        <div className="w-full h-full relative flex flex-col group p-2 sm:p-4">
             {/* Background Glow */}
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500/0 via-blue-500/50 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
 
-            <div className="flex justify-between items-end mb-6 relative z-10">
+            <div className="flex justify-between items-end mb-4 relative z-10">
                 <div>
                     <h3 className="text-white font-bold text-lg flex items-center gap-2">
                         <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -35,29 +35,40 @@ const TimeSeriesChart = ({ data }) => {
             
             <div className="w-full h-[250px] cursor-crosshair mt-4">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <LineChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                        <defs>
+                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                            </linearGradient>
+                            <linearGradient id="colorUtil" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                         <XAxis 
                             dataKey="tick" 
-                            stroke="#64748b" 
+                            stroke="#475569" 
                             fontSize={10} 
                             tickLine={false}
                             axisLine={false}
                             tick={{ fill: '#64748b' }}
                             tickFormatter={(tick) => `Tick ${tick}`}
+                            minTickGap={20}
                         />
                         <YAxis 
                             yAxisId="left" 
-                            stroke="#64748b" 
+                            stroke="#475569" 
                             fontSize={10} 
                             tickLine={false}
                             axisLine={false}
-                            tickFormatter={(val) => `$${val}`}
+                            tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
                         />
                         <YAxis 
                             yAxisId="right" 
                             orientation="right" 
-                            stroke="#64748b" 
+                            stroke="#475569" 
                             fontSize={10} 
                             tickLine={false}
                             axisLine={false}
@@ -65,39 +76,41 @@ const TimeSeriesChart = ({ data }) => {
                             tickFormatter={(val) => `${val}%`}
                         />
                         <Tooltip 
-                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '0.5rem', color: '#f8fafc', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
-                            itemStyle={{ color: '#e2e8f0', fontSize: '12px' }}
-                            labelStyle={{ color: '#94a3b8', marginBottom: '4px', fontSize: '11px', fontWeight: 'bold' }}
+                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '0.75rem', color: '#f8fafc', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
+                            itemStyle={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 'bold' }}
+                            labelStyle={{ color: '#64748b', marginBottom: '6px', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                            cursor={{ stroke: '#334155', strokeWidth: 1, strokeDasharray: '5 5' }}
                             formatter={(value, name) => {
                                 if (name === 'Revenue') return [formatMoney(value), name];
                                 return [`${value}%`, 'Utilization'];
                             }}
-                            labelFormatter={(label) => `Tick ${label}`}
+                            labelFormatter={(label) => `Simulation Tick ${label}`}
                         />
-                        <Line 
+                        <Area 
                             yAxisId="left"
                             type="monotone" 
                             dataKey="revenue" 
                             name="Revenue"
-                            stroke="#60a5fa" 
+                            stroke="#3b82f6" 
                             strokeWidth={3}
-                            dot={false}
-                            activeDot={{ r: 6, strokeWidth: 0, fill: '#60a5fa' }}
-                            isAnimationActive={false}
+                            fillOpacity={1}
+                            fill="url(#colorRevenue)"
+                            isAnimationActive={true}
+                            animationDuration={300}
                         />
-                         <Line 
+                         <Area 
                             yAxisId="right"
                             type="monotone" 
                             dataKey="utilization" 
                             name="Utilization"
-                            stroke="#34d399" 
+                            stroke="#10b981" 
                             strokeWidth={2}
-                            strokeDasharray="5 5"
-                            dot={false}
-                            activeDot={{ r: 4, strokeWidth: 0, fill: '#34d399' }}
-                            isAnimationActive={false}
+                            fillOpacity={1}
+                            fill="url(#colorUtil)"
+                            isAnimationActive={true}
+                            animationDuration={300}
                         />
-                    </LineChart>
+                    </AreaChart>
                 </ResponsiveContainer>
             </div>
             

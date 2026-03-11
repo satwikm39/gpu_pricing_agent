@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import MetricCards from './components/MetricCards'
 import LiveFeed from './components/LiveFeed'
 import ROIMeter from './components/ROIMeter'
@@ -19,10 +19,10 @@ function App() {
   })
   const [feed, setFeed] = useState([])
 
-  const [fleetState, setFleetState] = useState(null)
+  const [fleetState] = useState(null)
   const [chartData, setChartData] = useState([]) // Historical data for Recharts
   const [savedRuns, setSavedRuns] = useState([]) // Array of saved scenario runs
-  const [notifications, setNotifications] = useState([]) // Toast notifications
+  const [notifications] = useState([]) // Toast notifications
   
   const [loading, setLoading] = useState(false)
   const [isAutoRunning, setIsAutoRunning] = useState(false)
@@ -45,7 +45,7 @@ function App() {
   const [agentStreamData, setAgentStreamData] = useState([]) // SSE data
   const [isThinking, setIsThinking] = useState(false)
 
-  const runTickStream = async () => {
+  const runTickStream = useCallback(async () => {
     if (loading || isThinking) return;
     
     setLoading(true)
@@ -119,7 +119,7 @@ function App() {
         setLoading(false)
         setIsThinking(false)
     }
-  }
+  }, [loading, isThinking]);
 
   // Handle auto-run interval
   useEffect(() => {
@@ -130,7 +130,7 @@ function App() {
         }, 3000) // 3 seconds per tick to allow reading the agents
     }
     return () => clearInterval(interval)
-  }, [isAutoRunning, activeTab, isThinking, loading])
+  }, [isAutoRunning, activeTab, isThinking, loading, runTickStream])
 
   useEffect(() => {
     const fetchInitial = async () => {
@@ -170,13 +170,13 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8 w-full flex flex-col gap-6">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
-        <div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-500 to-accent-500 tracking-tight">
+    <div className="min-h-screen p-4 md:p-6 lg:p-6 w-full flex flex-col gap-5 font-sans">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-0 shrink-0">
+        <div className="flex flex-col">
+            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-primary-500 to-accent-400 tracking-tight font-display drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">
                 GPU Pricing Agent
             </h1>
-            <p className="text-slate-400 mt-1">Autonomous Deal Desk Simulation</p>
+            <p className="text-slate-400 mt-1 uppercase tracking-widest text-xs font-semibold">Autonomous Deal Desk Simulation</p>
         </div>
         
         {activeTab === 'simulation' && (
@@ -252,20 +252,20 @@ function App() {
         )}
       </header>
 
-      <div className="flex bg-slate-800/50 p-1 rounded-lg w-full md:w-fit mt-[-10px]">
+      <div className="flex bg-slate-800/40 p-1.5 rounded-xl w-full md:w-fit mt-[-10px] border border-white/5 backdrop-blur-md">
         <button 
           onClick={() => setActiveTab('simulation')}
-          className={`px-4 py-2 flex-1 md:flex-none rounded-md text-sm font-semibold transition-all ${activeTab === 'simulation' ? 'bg-primary-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+          className={`px-5 py-2.5 flex-1 md:flex-none rounded-lg text-sm font-bold tracking-wide transition-all ${activeTab === 'simulation' ? 'bg-primary-600 text-white shadow-[0_4px_20px_rgba(37,99,235,0.4)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
         >Live Agent Simulation</button>
         <button 
           onClick={() => setActiveTab('runs')}
-          className={`px-4 py-2 flex-1 md:flex-none rounded-md text-sm font-semibold transition-all ${activeTab === 'runs' ? 'bg-purple-600/80 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'} ${savedRuns.length === 0 ? 'hidden' : ''}`}
+          className={`px-5 py-2.5 flex-1 md:flex-none rounded-lg text-sm font-bold tracking-wide transition-all ${activeTab === 'runs' ? 'bg-accent-600 text-white shadow-[0_4px_20px_rgba(124,58,237,0.4)]' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'} ${savedRuns.length === 0 ? 'hidden' : ''}`}
         >Scenario Comparisons ({savedRuns.length})</button>
       </div>
 
       {activeTab === 'runs' ? (
-        <div className="flex flex-col gap-6 animate-fade-in">
-            <h2 className="text-2xl font-bold text-white mb-2">Saved Scenarios</h2>
+        <div className="flex flex-col gap-6 animate-fade-in w-full max-w-7xl mx-auto">
+            <h2 className="text-3xl font-display font-bold text-white mb-2">Saved Scenarios</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {savedRuns.map((run, idx) => (
                     <div key={idx} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 shadow-xl flex flex-col gap-4 relative overflow-hidden group">
@@ -305,58 +305,81 @@ function App() {
             )}
         </div>
       ) : (
-        <div className="flex flex-col xl:flex-row gap-6 flex-1 h-[calc(100vh-140px)] animate-fade-in w-full">
-            {/* Left Column: Controls */}
-            <div className="w-full xl:w-[384px] 2xl:w-[420px] flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar shrink-0 pb-10">
-                <PolicyControls />
-            </div>
-
-            {/* Right Column: Dashboard & Feed */}
-            <div className="flex-1 flex flex-col gap-6 overflow-y-auto overflow-x-hidden custom-scrollbar pb-10 pr-2">
-                {/* Top Section: Metrics and Charts */}
-                <div className="flex flex-col gap-4 shrink-0">
-                    <ROIMeter metrics={metrics} />
-                    <MetricCards metrics={metrics} fleetState={fleetState} />
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <TimeSeriesChart data={chartData} />
-                        <FleetROIDistribution fleetState={fleetState} />
+        <div className="flex flex-col gap-5 animate-fade-in w-full">
+            
+            {/* Command Center: High-Level Executive Dashboard */}
+            <div className="glass-panel w-full p-5 glow-top">
+                <div className="flex flex-col lg:flex-row gap-5 items-center">
+                    <div className="w-full lg:w-1/3 shrink-0">
+                        <ROIMeter metrics={metrics} />
+                    </div>
+                    <div className="w-full lg:w-2/3">
+                        <MetricCards metrics={metrics} fleetState={fleetState} />
                     </div>
                 </div>
+            </div>
 
-                {/* Bottom Section: Live Feed */}
-                <div className="glass-panel w-full flex-col flex shrink-0 mt-2">
-                    <div className="px-6 py-4 border-b border-slate-700/50 bg-slate-800/80 backdrop-blur flex justify-between items-center z-10 sticky top-0 rounded-t-2xl">
-                        <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
-                            <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse-slow shadow-[0_0_10px_rgba(34,197,94,1)]"></span>
-                            Live Deal Feed
-                        </h2>
-                        <span className="text-slate-400 text-sm">{feed.length} Decisions</span>
+            <div className="flex flex-col xl:flex-row gap-5 w-full items-start">
+                {/* Main Content: Left Column (Controls) & Middle Column (Feed) */}
+                <div className="flex-1 flex flex-col xl:flex-row gap-5 w-full">
+                    {/* Left Column: Policy Controls */}
+                    <div className="w-full xl:w-[360px] flex flex-col gap-5 shrink-0">
+                        <PolicyControls />
                     </div>
-                    <div className="p-6 flex flex-col gap-6 min-h-[400px]">
-                        {feed.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center text-slate-500 italic mt-10">
-                                No data yet. Click "Run Next Tick" to generate simulated requests.
+
+                    {/* Middle Column: Live Feed & Analytics */}
+                    <div className="flex-1 flex flex-col gap-5">
+                        
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 w-full shrink-0">
+                            <div className="glass-panel p-1 sm:p-3 min-h-[380px] flex flex-col">
+                                <TimeSeriesChart data={chartData} />
                             </div>
-                        ) : (
-                            feed.map((tick, idx) => (
-                                <div key={idx} className="flex flex-col gap-6 w-full">
-                                    <LiveFeed data={tick} />
-                                    {idx < feed.length - 1 && (
-                                        <div className="flex items-center w-full px-4 sm:px-12 opacity-50 py-1">
-                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-500 to-slate-500"></div>
-                                            <div className="mx-4 w-1.5 h-1.5 rounded-full bg-slate-500 shadow-[0_0_8px_rgba(100,116,139,0.8)]"></div>
-                                            <div className="flex-1 h-px bg-gradient-to-l from-transparent via-slate-500 to-slate-500"></div>
+                            <div className="glass-panel p-1 sm:p-3 min-h-[380px] flex flex-col">
+                                <FleetROIDistribution fleetState={fleetState} />
+                            </div>
+                        </div>
+
+                        {/* Bottom Section: Live Feed */}
+                        <div className="glass-panel w-full flex-col flex flex-1 mt-0 glow-top min-h-[500px]">
+                            <div className="px-6 py-4 border-b border-white/10 bg-slate-900/60 flex justify-between items-center z-10 sticky top-0">
+                                <h2 className="text-xl font-display font-bold flex items-center gap-3 text-white">
+                                    <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-500 shadow-[0_0_15px_rgba(59,130,246,1)]"></span>
+                                    </span>
+                                    Executive Live Deal Feed
+                                </h2>
+                                <span className="text-slate-400 text-sm font-semibold uppercase tracking-widest bg-slate-800/50 px-3 py-1 rounded-full border border-white/5">{feed.length} Decisions</span>
+                            </div>
+                            <div className="p-6 flex flex-col gap-6 min-h-[400px]">
+                                {feed.length === 0 ? (
+                                    <div className="flex-1 flex items-center justify-center text-slate-500 italic mt-10">
+                                        No data yet. Click "Run Next Tick" to generate simulated requests.
+                                    </div>
+                                ) : (
+                                    feed.map((tick, idx) => (
+                                        <div key={idx} className="flex flex-col gap-6 w-full">
+                                            <LiveFeed data={tick} />
+                                            {idx < feed.length - 1 && (
+                                                <div className="flex items-center w-full px-4 sm:px-12 opacity-50 py-1">
+                                                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-500 to-slate-500"></div>
+                                                    <div className="mx-4 w-1.5 h-1.5 rounded-full bg-slate-500 shadow-[0_0_8px_rgba(100,116,139,0.8)]"></div>
+                                                    <div className="flex-1 h-px bg-gradient-to-l from-transparent via-slate-500 to-slate-500"></div>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            ))
-                        )}
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
+                
+                {/* Right Column: Agent Reasoning Sidebar */}
+                <div className="w-full xl:w-[420px] 2xl:w-[480px] shrink-0 h-full z-30">
+                    <AgentSidebar streamData={agentStreamData} isThinking={isThinking} />
+                </div>
             </div>
-
-            {/* Right Column: Agent Reasoning Sidebar */}
-            <AgentSidebar streamData={agentStreamData} isThinking={isThinking} />
         </div>
       )}
 
