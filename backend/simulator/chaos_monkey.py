@@ -36,7 +36,9 @@ class ChaosMonkeySimulator:
             "min_margin": "15%",
             "scarcity_threshold": "10", # 10%
             "scarcity_multiplier": "3.0",
-            "max_market_premium": "20%" # 20% over market is the absolute limit
+            "max_market_premium": "20%", # 20% over market is the absolute limit
+            "eviction_delta": "$1.50", # Must beat current spot by this amount to justify eviction
+            "post_roi_discount_floor": "50%" # Deepest spot discount allowed on paid-off hardware
         }
         
         self.environment_settings = {
@@ -44,11 +46,35 @@ class ChaosMonkeySimulator:
             "depreciation_cost": 1.00,
             "power_opex": 0.50
         }
+        
+        self.current_market_scenario = "predictable" # 'predictable', 'demand_spike', 'market_slump'
 
     def generate_random_state(self) -> GPUState:
-        # Simulate a fleet of 1000 H100s
-        available = random.choices([500, 50, 0], weights=[0.7, 0.2, 0.1])[0] # 70% normal, 20% scarce, 10% empty
-        active_spot = 200 if available < 100 else 50
+        gpu = self.environment_settings["gpu_type"]
+        
+        # Fleet Capacities by GPU Type
+        fleet_scale = {
+            "B200": 250,
+            "H200": 500,
+            "H100": 1000,
+            "A100": 2500,
+            "L40S": 5000,
+            "V100": 8000,
+            "RTX4090": 15000
+        }
+        total_inv = fleet_scale.get(gpu, 1000)
+
+        # Scale availability based on current scenario and total inventory
+        if self.current_market_scenario == "demand_spike":
+            available = 0 # Force 0 inventory to trigger scarcity/evictions
+            active_spot = int(total_inv * 0.8) # Lots of spot instances to evict
+        elif self.current_market_scenario == "market_slump":
+            available = int(total_inv * 0.95) # Massive oversupply
+            active_spot = int(total_inv * 0.01)
+        else:
+            pct = random.choices([0.5, 0.05, 0], weights=[0.7, 0.2, 0.1])[0] # 70% half full, 20% scarce, 10% empty
+            available = int(total_inv * pct)
+            active_spot = int(total_inv * 0.2) if available < int(total_inv * 0.1) else int(total_inv * 0.05)
         
         # Simulate Live Market
         gpu = self.environment_settings["gpu_type"]
@@ -62,8 +88,8 @@ class ChaosMonkeySimulator:
         competitor = random.choice(["AWS", "Azure", "CoreWeave", "Lambda Labs"])
         
         return GPUState(
-            gpu_type=self.environment_settings["gpu_type"],
-            total_inventory=1000,
+            gpu_type=gpu,
+            total_inventory=total_inv,
             available_inventory=available,
             active_spot_leases=active_spot,
             depreciation_cost_per_hour=float(self.environment_settings["depreciation_cost"]),
@@ -75,10 +101,20 @@ class ChaosMonkeySimulator:
 
     def generate_stochastic_request(self, state: GPUState) -> LeaseRequest:
         # Chaos Logic: If inventory is 0, someone REALLY wants an On-Demand instance
-        if state.available_inventory == 0:
+        if self.current_market_scenario == "demand_spike" or state.available_inventory == 0:
             wt = "On-Demand"
+        elif self.current_market_scenario == "market_slump":
+            wt = "Spot" # Everyone is cheap
         else:
             wt = random.choices(["On-Demand", "Spot"], weights=[0.4, 0.6])[0]
+            
+        # Determine bid price for spot
+        bid = 0.80
+        if wt == "Spot":
+            if self.current_market_scenario == "market_slump":
+                bid = random.uniform(0.10, 0.30) # Extremely low bids
+            else:
+                bid = random.uniform(0.60, 1.20)
             
         return LeaseRequest(
             request_id=f"REQ-{str(uuid.uuid4())[:6]}",
@@ -87,7 +123,7 @@ class ChaosMonkeySimulator:
             quantity=random.randint(1, 8),
             duration_hours=random.choice([1, 24, 168]),
             workload_type=wt,
-            bid_price_per_hour=0.80 if wt == "Spot" else None
+            bid_price_per_hour=bid if wt == "Spot" else None
         )
 
     def run_tick(self):

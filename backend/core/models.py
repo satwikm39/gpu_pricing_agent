@@ -4,7 +4,7 @@ from typing import Optional, Literal
 class LeaseRequest(BaseModel):
     request_id: str
     region: str
-    gpu_type: Literal["H100", "A100", "L40S", "T4"]
+    gpu_type: Literal["B200", "H200", "H100", "A100", "L40S", "V100", "RTX4090", "T4"]
     quantity: int
     duration_hours: float
     workload_type: Literal["On-Demand", "Spot"]

@@ -4,6 +4,8 @@ import LiveFeed from './components/LiveFeed'
 import ROIMeter from './components/ROIMeter'
 import PolicyControls from './components/PolicyControls'
 import StaticCalculator from './components/StaticCalculator'
+import TimeSeriesChart from './components/TimeSeriesChart'
+import FleetROIDistribution from './components/FleetROIDistribution'
 
 function App() {
   const [activeTab, setActiveTab] = useState('simulation') // 'simulation' or 'calculator'
@@ -16,10 +18,29 @@ function App() {
     roi_percentage: 0
   })
   const [feed, setFeed] = useState([])
+
   const [fleetState, setFleetState] = useState(null)
+  const [chartData, setChartData] = useState([]) // Historical data for Recharts
+  const [savedRuns, setSavedRuns] = useState([]) // Array of saved scenario runs
+  const [notifications, setNotifications] = useState([]) // Toast notifications
   
   const [loading, setLoading] = useState(false)
   const [isAutoRunning, setIsAutoRunning] = useState(false)
+
+  // Auto-reset metrics on initial page load
+  useEffect(() => {
+      const resetOnLoad = async () => {
+          try {
+              await fetch('http://localhost:8000/api/metrics/reset', { method: 'POST' });
+              const response = await fetch('http://localhost:8000/api/metrics');
+              const data = await response.json();
+              setMetrics(data);
+          } catch (err) {
+              console.error("Failed to reset metrics on load", err);
+          }
+      };
+      resetOnLoad();
+  }, []);
 
   const runTick = async () => {
     setLoading(true)
@@ -27,8 +48,36 @@ function App() {
         const response = await fetch('http://localhost:8000/api/tick')
         const data = await response.json()
         setMetrics(data.metrics)
-        setFleetState(data.state)
+        
+        // Track completed jobs/freed resources using functional state update
+        setFleetState(prevFleet => {
+            if (prevFleet && data.state.available_inventory > prevFleet.available_inventory) {
+                const freed = data.state.available_inventory - prevFleet.available_inventory;
+                const id = Date.now();
+                setNotifications(prevArr => [...prevArr, { id, freed }]);
+                
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    setNotifications(prevArr => prevArr.filter(n => n.id !== id));
+                }, 5000);
+            }
+            return data.state;
+        });
+
         setFeed(prev => [data, ...prev])
+        
+        // Append to historical chart data
+        setChartData(prev => {
+            const utilization = data.state.total_inventory > 0 
+                ? ((data.state.total_inventory - data.state.available_inventory) / data.state.total_inventory) * 100 
+                : 0;
+            const newPoint = {
+                tick: prev.length + 1,
+                revenue: data.metrics.total_revenue,
+                utilization: parseFloat(utilization.toFixed(2))
+            };
+            return [...prev, newPoint].slice(-50); // Keep last 50 ticks for performance
+        })
     } catch (err) {
         console.error("Failed to run tick", err)
     } finally {
@@ -60,8 +109,32 @@ function App() {
     fetchInitial()
   }, [])
 
+  const saveCurrentRun = async () => {
+      if (feed.length === 0) return;
+      const runName = `Run ${savedRuns.length + 1} (${feed.length} Ticks)`;
+      const newRun = {
+          name: runName,
+          metrics: { ...metrics },
+          chartData: [...chartData]
+      };
+      setSavedRuns(prev => [...prev, newRun]);
+      
+      // Reset current active simulation
+      setFeed([]);
+      setChartData([]);
+      try {
+          // Tell the backend to reset the metrics tracking counters
+          await fetch('http://localhost:8000/api/metrics/reset', { method: 'POST' });
+          const response = await fetch('http://localhost:8000/api/metrics')
+          const data = await response.json()
+          setMetrics(data)
+      } catch (err) {
+          console.error("Failed to reset backend metrics", err);
+      }
+  }
+
   return (
-    <div className="min-h-screen p-6 md:p-8 lg:p-12 max-w-7xl mx-auto flex flex-col gap-6">
+    <div className="min-h-screen p-4 md:p-6 lg:p-8 w-full flex flex-col gap-6">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
         <div>
             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-500 to-accent-500 tracking-tight">
@@ -115,6 +188,30 @@ function App() {
                         </>
                     )}
                 </button>
+                <div className="w-px h-8 bg-slate-700 mx-1 self-center hidden sm:block"></div>
+                <button 
+                    onClick={saveCurrentRun}
+                    disabled={feed.length === 0 || isAutoRunning}
+                    className="px-4 py-2 sm:px-4 sm:py-3 rounded-lg font-semibold transition-all duration-300 flex items-center gap-2 border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Save current metrics and reset simulation"
+                >
+                    <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                    </svg>
+                    <span className="hidden sm:inline">Save Run</span>
+                </button>
+                {savedRuns.length > 0 && (
+                    <button 
+                        onClick={() => setActiveTab('runs')}
+                        className="px-4 py-2 sm:px-4 sm:py-3 rounded-lg font-semibold transition-all duration-300 flex items-center gap-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 relative"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span className="hidden sm:inline">Compare</span>
+                        <div className="absolute -top-2 -right-2 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg border border-slate-900">{savedRuns.length}</div>
+                    </button>
+                )}
             </div>
         )}
       </header>
@@ -128,33 +225,86 @@ function App() {
           onClick={() => setActiveTab('simulation')}
           className={`px-4 py-2 flex-1 md:flex-none rounded-md text-sm font-semibold transition-all ${activeTab === 'simulation' ? 'bg-primary-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
         >Live Agent Simulation</button>
+        <button 
+          onClick={() => setActiveTab('runs')}
+          className={`px-4 py-2 flex-1 md:flex-none rounded-md text-sm font-semibold transition-all ${activeTab === 'runs' ? 'bg-purple-600/80 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'} ${savedRuns.length === 0 ? 'hidden' : ''}`}
+        >Scenario Comparisons ({savedRuns.length})</button>
       </div>
 
       {activeTab === 'calculator' ? (
         <StaticCalculator />
+      ) : activeTab === 'runs' ? (
+        <div className="flex flex-col gap-6 animate-fade-in">
+            <h2 className="text-2xl font-bold text-white mb-2">Saved Scenarios</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {savedRuns.map((run, idx) => (
+                    <div key={idx} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 shadow-xl flex flex-col gap-4 relative overflow-hidden group">
+                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-500/0 via-purple-500/50 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
+                        <h3 className="text-lg font-bold text-white flex justify-between items-center">
+                            {run.name}
+                            <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded border border-purple-500/30">ROI: {run.metrics.roi_percentage.toFixed(1)}%</span>
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Total Rev</p>
+                                <p className="text-blue-400 font-mono font-bold text-lg">${run.metrics.total_revenue.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Trust Score</p>
+                                <p className={`${run.metrics.trust_score >= 80 ? 'text-green-400' : run.metrics.trust_score >= 50 ? 'text-yellow-400' : 'text-red-400'} font-mono font-bold text-lg`}>{run.metrics.trust_score.toFixed(1)}/100</p>
+                            </div>
+                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Evicted</p>
+                                <p className="text-orange-400 font-mono font-bold text-lg">{run.metrics.evictions}</p>
+                            </div>
+                            <div className="bg-slate-900/50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Rejected</p>
+                                <p className="text-red-400 font-mono font-bold text-lg">{run.metrics.rejected_deals}</p>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {savedRuns.length > 0 && (
+                <div className="mt-4">
+                    <button onClick={() => setSavedRuns([])} className="text-sm text-red-500 hover:text-red-400 transition-colors flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        Clear All Saved Runs
+                    </button>
+                </div>
+            )}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 h-full min-h-[600px] animate-fade-in">
-            <div className="lg:col-span-1 flex flex-col gap-6">
+        <div className="flex flex-col xl:flex-row gap-6 flex-1 h-[calc(100vh-140px)] animate-fade-in w-full">
+            {/* Left Column: Controls */}
+            <div className="w-full xl:w-[384px] 2xl:w-[420px] flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar shrink-0 pb-10">
                 <PolicyControls />
             </div>
-            
-            <div className="lg:col-span-3 flex flex-col gap-6 lg:max-h-[85vh] overflow-hidden">
-                <div className="flex flex-col gap-4">
+
+            {/* Right Column: Dashboard & Feed */}
+            <div className="flex-1 flex flex-col gap-6 overflow-y-auto overflow-x-hidden custom-scrollbar pb-10 pr-2">
+                {/* Top Section: Metrics and Charts */}
+                <div className="flex flex-col gap-4 shrink-0">
                     <ROIMeter metrics={metrics} />
                     <MetricCards metrics={metrics} fleetState={fleetState} />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <TimeSeriesChart data={chartData} />
+                        <FleetROIDistribution fleetState={fleetState} />
+                    </div>
                 </div>
-                
-                <div className="glass-panel flex-1 flex flex-col overflow-hidden relative">
-                    <div className="px-6 py-4 border-b border-slate-700/50 bg-slate-800/80 backdrop-blur flex justify-between items-center z-10 sticky top-0">
+
+                {/* Bottom Section: Live Feed */}
+                <div className="glass-panel w-full flex-col flex shrink-0 mt-2">
+                    <div className="px-6 py-4 border-b border-slate-700/50 bg-slate-800/80 backdrop-blur flex justify-between items-center z-10 sticky top-0 rounded-t-2xl">
                         <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
                             <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse-slow shadow-[0_0_10px_rgba(34,197,94,1)]"></span>
                             Live Deal Feed
                         </h2>
                         <span className="text-slate-400 text-sm">{feed.length} Decisions</span>
                     </div>
-                    <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6 scroll-smooth">
+                    <div className="p-6 flex flex-col gap-6 min-h-[400px]">
                         {feed.length === 0 ? (
-                            <div className="h-full flex items-center justify-center text-slate-500 italic mt-20">
+                            <div className="flex-1 flex items-center justify-center text-slate-500 italic mt-10">
                                 No data yet. Click "Run Next Tick" to generate simulated requests.
                             </div>
                         ) : (
@@ -176,6 +326,22 @@ function App() {
             </div>
         </div>
       )}
+
+      {/* Notification Toasts */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+          {notifications.map(n => (
+              <div key={n.id} className="bg-emerald-500/90 text-white px-5 py-4 rounded-xl shadow-[0_10px_40px_rgba(16,185,129,0.3)] backdrop-blur-md flex items-center gap-3 animate-slide-up border border-emerald-400">
+                  <div className="bg-emerald-400/20 p-1.5 rounded-full flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                  </div>
+                  <span className="font-medium text-sm tracking-wide">
+                      Leases expired: <span className="font-bold text-white">+{n.freed} GPUs</span> returned to pool.
+                  </span>
+              </div>
+          ))}
+      </div>
     </div>
   )
 }

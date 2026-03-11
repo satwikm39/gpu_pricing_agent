@@ -5,7 +5,9 @@ const PolicyControls = () => {
         min_margin: '15',
         scarcity_threshold: '10',
         scarcity_multiplier: '3.0',
-        max_market_premium: '20'
+        max_market_premium: '20',
+        eviction_delta: '1.50',
+        post_roi_discount_floor: '50'
     });
     const [envSettings, setEnvSettings] = useState({
         gpu_type: 'H100',
@@ -18,6 +20,8 @@ const PolicyControls = () => {
 
     const [envSaving, setEnvSaving] = useState(false);
     const [envSaved, setEnvSaved] = useState(false);
+
+    const [activeEvent, setActiveEvent] = useState('predictable');
 
     const handleChange = (e) => {
         setSettings({
@@ -43,7 +47,9 @@ const PolicyControls = () => {
                 min_margin: `${settings.min_margin}%`,
                 scarcity_threshold: settings.scarcity_threshold,
                 scarcity_multiplier: settings.scarcity_multiplier,
-                max_market_premium: `${settings.max_market_premium}%`
+                max_market_premium: `${settings.max_market_premium}%`,
+                eviction_delta: `$${settings.eviction_delta}`,
+                post_roi_discount_floor: `${settings.post_roi_discount_floor}%`
             };
             
             await fetch('http://localhost:8000/api/settings', {
@@ -74,6 +80,19 @@ const PolicyControls = () => {
             console.error(err);
         } finally {
             setEnvSaving(false);
+        }
+    };
+
+    const triggerChaosEvent = async (scenario) => {
+        setActiveEvent(scenario);
+        try {
+            await fetch('http://localhost:8000/api/chaos/event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scenario })
+            });
+        } catch(err) {
+            console.error(err);
         }
     };
 
@@ -154,6 +173,38 @@ const PolicyControls = () => {
                 </div>
             </div>
 
+            <div className="pt-2 border-t border-slate-700/50">
+                <div className="flex justify-between text-sm mb-1.5">
+                    <label className="text-slate-300 font-medium whitespace-nowrap overflow-hidden text-ellipsis mr-2">Eviction Delta ($)</label>
+                    <span className="text-purple-400 font-mono bg-purple-500/10 px-2 py-0.5 rounded">${settings.eviction_delta}</span>
+                </div>
+                <input 
+                    type="range" 
+                    name="eviction_delta"
+                    min="0.10" max="5.00" step="0.10"
+                    value={settings.eviction_delta}
+                    onChange={handleChange}
+                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Min. gap to kick Spot user for On-Demand</p>
+            </div>
+
+            <div className="pt-2 border-t border-slate-700/50">
+                <div className="flex justify-between text-sm mb-1.5">
+                    <label className="text-slate-300 font-medium whitespace-nowrap overflow-hidden text-ellipsis mr-2">Post-ROI Spot Discount (%)</label>
+                    <span className="text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded">{settings.post_roi_discount_floor}%</span>
+                </div>
+                <input 
+                    type="range" 
+                    name="post_roi_discount_floor"
+                    min="0" max="100" step="5"
+                    value={settings.post_roi_discount_floor}
+                    onChange={handleChange}
+                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Max spot discount on Paid-Off cards (Bypasses Margin Floor)</p>
+            </div>
+
             <button 
                 onClick={handleSave}
                 disabled={saving || saved}
@@ -182,9 +233,13 @@ const PolicyControls = () => {
                     onChange={handleEnvChange}
                     className="w-full bg-slate-800 text-slate-200 border border-slate-600 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
                 >
-                    <option value="H100">NVIDIA H100 (High-End Gen AI)</option>
-                    <option value="A100">NVIDIA A100 (Legacy Model Training)</option>
-                    <option value="L40S">NVIDIA L40S (Inference & Graphics)</option>
+                    <option value="B200">NVIDIA B200 (Blackwell AI) • 250 Units</option>
+                    <option value="H200">NVIDIA H200 (Advanced Gen AI) • 500 Units</option>
+                    <option value="H100">NVIDIA H100 (High-End Gen AI) • 1,000 Units</option>
+                    <option value="A100">NVIDIA A100 (Legacy Training) • 2,500 Units</option>
+                    <option value="L40S">NVIDIA L40S (Inference/Graphics) • 5,000 Units</option>
+                    <option value="V100">NVIDIA V100 (Budget Compute) • 8,000 Units</option>
+                    <option value="RTX4090">NVIDIA RTX 4090 (Consumer GPU) • 15,000 Units</option>
                 </select>
                 <p className="text-xs text-slate-500 mt-2">Sets the default hardware type the Agent will simulate traffic for.</p>
             </div>
@@ -226,6 +281,55 @@ const PolicyControls = () => {
             >
                 {envSaving ? 'Syncing...' : envSaved ? 'Environment Updated!' : 'Update Hardware Costs'}
             </button>
+        </div>
+
+        {/* Market Conditions Panel */}
+        <div className="glass-panel p-5 flex flex-col gap-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+            
+            <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2 relative z-10">
+                <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Market Simulator
+            </h3>
+            
+            <p className="text-xs text-slate-400 mb-2 relative z-10">Override the stochastic engine to force specific fleet supply limits.</p>
+            
+            <div className="flex flex-col gap-3 relative z-10">
+                <button 
+                    onClick={() => triggerChaosEvent('demand_spike')}
+                    className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all flex items-center justify-between border ${activeEvent === 'demand_spike' ? 'bg-red-500/20 border-red-500 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
+                >
+                    <span className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${activeEvent === 'demand_spike' ? 'bg-red-400 animate-pulse' : 'bg-slate-600'}`}></span>
+                        Demand Spike
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-60">0% Avail</span>
+                </button>
+                
+                <button 
+                    onClick={() => triggerChaosEvent('market_slump')}
+                    className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all flex items-center justify-between border ${activeEvent === 'market_slump' ? 'bg-blue-500/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
+                >
+                    <span className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${activeEvent === 'market_slump' ? 'bg-blue-400 animate-pulse' : 'bg-slate-600'}`}></span>
+                        Market Slump
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-60">95% Avail</span>
+                </button>
+                
+                <button 
+                    onClick={() => triggerChaosEvent('predictable')}
+                    className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all flex items-center justify-between border ${activeEvent === 'predictable' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
+                >
+                    <span className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${activeEvent === 'predictable' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`}></span>
+                        Predictable
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-60">Stochastic</span>
+                </button>
+            </div>
         </div>
     </div>
     );

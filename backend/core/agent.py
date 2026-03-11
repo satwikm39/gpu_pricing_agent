@@ -35,12 +35,14 @@ POLICY B: Scarcity-Driven Yield Management
 - Rule: IF `Live_GPU_Fleet_State.available_inventory` as a percentage of `total_inventory` is LESS than {scarcity_threshold}%, THEN apply a {scarcity_multiplier}x multiplier to the `Calculated_Base_Quote.base_price_per_hour`. action="OVERRIDE".
 
 POLICY C: Strategic Preemption (Eviction)
-- Rule: If a high-paying 'On-Demand' request arrives, but `available_inventory` is 0, AND `active_spot_leases` > 0, you MUST Evict a spot instance to serve the On-Demand customer.
+- Rule: If a high-paying 'On-Demand' request arrives, but `available_inventory` is 0, AND `active_spot_leases` > 0, you MUST evaluate an eviction.
+- IF (`Calculated_Base_Quote.base_price_per_hour` - `Live_GPU_Fleet_State.market_price_per_hour`) >= {eviction_delta}, THEN you MUST Evict a spot instance to serve the On-Demand customer.
 - action="EVICT". Set `target_eviction_id` to a placeholder ID like "SPOT-1234".
-- Your explanation MUST be polite.
+- Your explanation MUST be polite and name the semantic reason for the eviction (the delta was high enough).
 
 POLICY D: Lifecycle Aggression (Cost Recovery)
-- Rule: If `Live_GPU_Fleet_State.cost_recovered` is TRUE, the hardware is pure profit. Bypass Policy A entirely and APPROVE any Spot bid, no matter how low.
+- Rule: If `Live_GPU_Fleet_State.cost_recovered` is TRUE, the hardware is pure profit. We want to maximize utilization via deep Spot discounts.
+- Bypass Policy A entirely for Spot requests. You are authorized to approve Spot bids up to a maximum discount of {post_roi_discount_floor} off the `Calculated_Base_Quote.base_price_per_hour`.
 
 POLICY E: Market Competitiveness
 - Rule: The user has set a maximum premium over live market rates of {max_market_premium}.
@@ -54,6 +56,13 @@ POLICY E: Market Competitiveness
 --- INSTRUCTIONS ---
 Analyze the input state. Determine which policies trigger.
 Return a structured JSON decision with the final action, price, and a "Glass-Box" explanation for the user.
+
+CRITICAL FORMATTING INSTRUCTION for `explanation`:
+You MUST format your explanation as a concise, three-bullet-point markdown list. 
+Do not write paragraphs. Use this exact structure:
+- **Base Math**: [Briefly state the base price calculation]
+- **Policy Check**: [Briefly state which policy was triggered and why]
+- **Final Decision**: [Briefly state the final action taken]
 """
 
         self.prompt_template = ChatPromptTemplate.from_messages([
@@ -84,6 +93,8 @@ Return a structured JSON decision with the final action, price, and a "Glass-Box
                 "scarcity_threshold": policy_thresholds.get("scarcity_threshold", "10"),
                 "scarcity_multiplier": policy_thresholds.get("scarcity_multiplier", "2.5"),
                 "max_market_premium": policy_thresholds.get("max_market_premium", "20%"),
+                "eviction_delta": policy_thresholds.get("eviction_delta", "$1.50"),
+                "post_roi_discount_floor": policy_thresholds.get("post_roi_discount_floor", "50%"),
                 "state_json": json.dumps(state_dict, indent=2)
             })
             return decision

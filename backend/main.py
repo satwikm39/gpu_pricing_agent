@@ -19,7 +19,11 @@ class StaticCalculationPayload(BaseModel):
 # Setup CORS to allow the frontend to communicate
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Since it's a demo, allow all
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,11 +37,16 @@ class SettingsUpdate(BaseModel):
     scarcity_threshold: str
     scarcity_multiplier: str
     max_market_premium: str
+    eviction_delta: str
+    post_roi_discount_floor: str
 
 class EnvironmentUpdate(BaseModel):
     gpu_type: str
     depreciation_cost: float
     power_opex: float
+
+class ChaosEvent(BaseModel):
+    scenario: str # 'predictable', 'demand_spike', 'market_slump'
 
 @app.get("/api/tick")
 async def run_tick():
@@ -68,7 +77,9 @@ async def update_settings(settings: SettingsUpdate):
         "min_margin": settings.min_margin,
         "scarcity_threshold": settings.scarcity_threshold,
         "scarcity_multiplier": settings.scarcity_multiplier,
-        "max_market_premium": settings.max_market_premium
+        "max_market_premium": settings.max_market_premium,
+        "eviction_delta": settings.eviction_delta,
+        "post_roi_discount_floor": settings.post_roi_discount_floor
     }
     return {"status": "success", "new_settings": simulator.policy_thresholds}
 
@@ -81,6 +92,12 @@ async def update_environment(env: EnvironmentUpdate):
         "power_opex": env.power_opex
     }
     return {"status": "success", "new_environment": simulator.environment_settings}
+
+@app.post("/api/chaos/event")
+async def trigger_chaos_event(event: ChaosEvent):
+    """Overrides the Chaos Monkey's current simulation mode."""
+    simulator.current_market_scenario = event.scenario
+    return {"status": "success", "scenario": simulator.current_market_scenario}
 
 @app.post("/api/calculate")
 async def calculate_static(payload: StaticCalculationPayload):

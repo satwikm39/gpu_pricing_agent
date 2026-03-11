@@ -141,9 +141,37 @@ const LiveFeed = ({ data }) => {
                     </svg>
                     Glass-Box Explanation
                 </div>
-                <p className="text-slate-200 text-sm leading-relaxed antialiased font-light tracking-wide border-l-2 border-slate-600 pl-4 py-1">
-                    {decision.explanation}
-                </p>
+                <div className="text-slate-200 text-sm leading-relaxed antialiased font-light tracking-wide border-l-2 border-slate-600 pl-4 py-2 space-y-3">
+                    {decision.explanation.split('\n').filter(line => line.trim()).map((line, i) => {
+                        // Match "- **BoldText**: Rest of line"
+                        const match = line.match(/^-\s*\*\*(.*?)\*\*:(.*)/);
+                        if (match) {
+                            return (
+                                <div key={i} className="flex gap-2 items-start">
+                                    <span className="text-accent-400 mt-0.5">•</span>
+                                    <div>
+                                        <span className="font-bold text-white tracking-wider uppercase text-xs mr-2">{match[1]}:</span>
+                                        <span className="text-slate-300">{match[2]}</span>
+                                    </div>
+                                </div>
+                            );
+                        }
+                        // Match "**BoldText**: Rest of line" (no bullet point)
+                        const matchNoBullet = line.match(/^\*\*(.*?)\*\*:(.*)/);
+                        if (matchNoBullet) {
+                             return (
+                                <div key={i} className="flex gap-2 items-start">
+                                    <span className="text-accent-400 mt-0.5">•</span>
+                                    <div>
+                                        <span className="font-bold text-white tracking-wider uppercase text-xs mr-2">{matchNoBullet[1]}:</span>
+                                        <span className="text-slate-300">{matchNoBullet[2]}</span>
+                                    </div>
+                                </div>
+                            );
+                        }
+                        return <p key={i}>{line}</p>;
+                    })}
+                </div>
                 {decision.target_eviction_id && (
                     <div className="mt-4 inline-flex shadow-[0_0_10px_rgba(239,68,68,0.2)] bg-red-500/10 text-red-400 text-sm px-4 py-2 rounded-md border border-red-500/30 font-mono items-center gap-2">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
