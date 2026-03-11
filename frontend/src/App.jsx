@@ -3,9 +3,9 @@ import MetricCards from './components/MetricCards'
 import LiveFeed from './components/LiveFeed'
 import ROIMeter from './components/ROIMeter'
 import PolicyControls from './components/PolicyControls'
-import StaticCalculator from './components/StaticCalculator'
 import TimeSeriesChart from './components/TimeSeriesChart'
 import FleetROIDistribution from './components/FleetROIDistribution'
+import AgentSidebar from './components/AgentSidebar'
 
 function App() {
   const [activeTab, setActiveTab] = useState('simulation') // 'simulation' or 'calculator'
@@ -42,46 +42,82 @@ function App() {
       resetOnLoad();
   }, []);
 
-  const runTick = async () => {
-    setLoading(true)
-    try {
-        const response = await fetch('http://localhost:8000/api/tick')
-        const data = await response.json()
-        setMetrics(data.metrics)
-        
-        // Track completed jobs/freed resources using functional state update
-        setFleetState(prevFleet => {
-            if (prevFleet && data.state.available_inventory > prevFleet.available_inventory) {
-                const freed = data.state.available_inventory - prevFleet.available_inventory;
-                const id = Date.now();
-                setNotifications(prevArr => [...prevArr, { id, freed }]);
-                
-                // Auto-dismiss after 5 seconds
-                setTimeout(() => {
-                    setNotifications(prevArr => prevArr.filter(n => n.id !== id));
-                }, 5000);
-            }
-            return data.state;
-        });
+  const [agentStreamData, setAgentStreamData] = useState([]) // SSE data
+  const [isThinking, setIsThinking] = useState(false)
 
-        setFeed(prev => [data, ...prev])
+  const runTickStream = async () => {
+    if (loading || isThinking) return;
+    
+    setLoading(true)
+    setIsThinking(true)
+    setAgentStreamData([])
+    let currentStream = [];
+    
+    try {
+        const response = await fetch('http://localhost:8000/api/tick/stream');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         
-        // Append to historical chart data
-        setChartData(prev => {
-            const utilization = data.state.total_inventory > 0 
-                ? ((data.state.total_inventory - data.state.available_inventory) / data.state.total_inventory) * 100 
-                : 0;
-            const newPoint = {
-                tick: prev.length + 1,
-                revenue: data.metrics.total_revenue,
-                utilization: parseFloat(utilization.toFixed(2))
-            };
-            return [...prev, newPoint].slice(-50); // Keep last 50 ticks for performance
-        })
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        
+        // Wait to process the chunks
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.replace('data: ', '');
+                    if (dataStr.trim() === '') continue;
+                    
+                    try {
+                        const data = JSON.parse(dataStr);
+                        
+                        currentStream.push(data);
+                        setAgentStreamData([...currentStream]);
+                        
+                        if (data.type === 'final_decision') {
+                            setMetrics(data.metrics);
+                            
+                            // Reconstruct the legacy 'tick' object for Live Feed compatibility
+                            const mockTick = {
+                                request: currentStream.find(d => d.type === 'initial')?.request || {},
+                                state: currentStream.find(d => d.type === 'initial')?.state || {},
+                                decision: data.decision,
+                                metrics: data.metrics
+                            };
+                            
+                            setFeed(prev => [mockTick, ...prev]);
+                            
+                            setChartData(prev => {
+                                const st = mockTick.state;
+                                const utilization = st && st.total_inventory > 0 
+                                    ? ((st.total_inventory - st.available_inventory) / st.total_inventory) * 100 
+                                    : 0;
+                                const newPoint = {
+                                    tick: prev.length + 1,
+                                    revenue: data.metrics.total_revenue,
+                                    utilization: parseFloat(utilization.toFixed(2))
+                                };
+                                return [...prev, newPoint].slice(-50);
+                            });
+                        }
+                    } catch (e) {
+                         console.error("Parse error on chunk", e);
+                    }
+                }
+            }
+        }
     } catch (err) {
-        console.error("Failed to run tick", err)
+        console.error("Failed to run tick stream", err)
     } finally {
         setLoading(false)
+        setIsThinking(false)
     }
   }
 
@@ -90,11 +126,11 @@ function App() {
     let interval;
     if (isAutoRunning && activeTab === 'simulation') {
         interval = setInterval(() => {
-            runTick()
-        }, 1500) // 1.5 seconds per tick
+            runTickStream()
+        }, 3000) // 3 seconds per tick to allow reading the agents
     }
     return () => clearInterval(interval)
-  }, [isAutoRunning, activeTab])
+  }, [isAutoRunning, activeTab, isThinking, loading])
 
   useEffect(() => {
     const fetchInitial = async () => {
@@ -167,7 +203,7 @@ function App() {
                     )}
                 </button>
                 <button 
-                    onClick={runTick}
+                    onClick={runTickStream}
                     disabled={loading || isAutoRunning}
                     className="px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all duration-300 flex items-center gap-2"
                 >
@@ -218,10 +254,6 @@ function App() {
 
       <div className="flex bg-slate-800/50 p-1 rounded-lg w-full md:w-fit mt-[-10px]">
         <button 
-          onClick={() => setActiveTab('calculator')}
-           className={`px-4 py-2 flex-1 md:flex-none rounded-md text-sm font-semibold transition-all ${activeTab === 'calculator' ? 'bg-accent-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-        >Static Base Math Calculator</button>
-        <button 
           onClick={() => setActiveTab('simulation')}
           className={`px-4 py-2 flex-1 md:flex-none rounded-md text-sm font-semibold transition-all ${activeTab === 'simulation' ? 'bg-primary-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
         >Live Agent Simulation</button>
@@ -231,9 +263,7 @@ function App() {
         >Scenario Comparisons ({savedRuns.length})</button>
       </div>
 
-      {activeTab === 'calculator' ? (
-        <StaticCalculator />
-      ) : activeTab === 'runs' ? (
+      {activeTab === 'runs' ? (
         <div className="flex flex-col gap-6 animate-fade-in">
             <h2 className="text-2xl font-bold text-white mb-2">Saved Scenarios</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -324,6 +354,9 @@ function App() {
                     </div>
                 </div>
             </div>
+
+            {/* Right Column: Agent Reasoning Sidebar */}
+            <AgentSidebar streamData={agentStreamData} isThinking={isThinking} />
         </div>
       )}
 

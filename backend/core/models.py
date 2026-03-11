@@ -37,3 +37,13 @@ class AgentDecision(BaseModel):
     final_price_per_hour: float
     explanation: str
     target_eviction_id: Optional[str] = None
+    pros_cons: Optional[str] = None
+
+class AgentThought(BaseModel):
+    agent_name: str
+    content: str
+
+class MultiAgentTrace(BaseModel):
+    request_id: str
+    thoughts: list[AgentThought] = Field(default_factory=list)
+    final_decision: Optional[AgentDecision] = None

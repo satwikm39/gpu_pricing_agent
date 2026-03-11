@@ -1,7 +1,7 @@
 import React from 'react';
 
 const LiveFeed = ({ data }) => {
-    const { state, request, quote, decision, inference_time } = data;
+    const { state, request, decision } = data;
 
     const isApprove = decision.action === 'APPROVE';
     const isOverride = decision.action === 'OVERRIDE';
@@ -62,74 +62,18 @@ const LiveFeed = ({ data }) => {
                     <div className={`px-4 py-1.5 rounded-full text-xs font-bold border ${getBadgeColor()} uppercase tracking-widest shadow-lg`}>
                         {decision.action}
                     </div>
-                    <div className="text-xs text-slate-500 mt-2 bg-slate-900/50 px-2 py-1 rounded inline-flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {inference_time.toFixed(2)}s inference
-                    </div>
                 </div>
             </div>
-
-            {/* Full Transparency Math Receipt */}
-            <div className="bg-slate-900/50 rounded-lg p-4 my-2 border border-slate-700/50 font-mono text-sm shadow-inner">
-                {/* Environmental Costs */}
-                <div className="flex justify-between items-center py-1.5 text-slate-500 border-b border-slate-700/50 mb-2">
-                    <span className="font-sans text-xs uppercase tracking-wider">Fleet Environment Costs</span>
-                    <span>Depreciation: ${state.depreciation_cost_per_hour.toFixed(2)}/hr | Power: ${state.power_opex_per_hour.toFixed(2)}/hr</span>
-                </div>
-
-                {/* Computational Quotes */}
-                <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center py-1">
-                        <span className="text-slate-400">Target Base Rate</span>
-                        <span className="text-white">${quote.base_rate.toFixed(2)} /hr</span>
-                    </div>
-
-                    {quote.volume_discount_amount > 0 && (
-                        <div className="flex justify-between items-center py-1 text-slate-400">
-                            <span>Volume Discount</span>
-                            <span className="text-green-400">- ${quote.volume_discount_amount.toFixed(2)}</span>
-                        </div>
-                    )}
-                    
-                    {quote.duration_discount_amount > 0 && (
-                        <div className="flex justify-between items-center py-1 text-slate-400">
-                            <span>Duration Discount</span>
-                            <span className="text-green-400">- ${quote.duration_discount_amount.toFixed(2)}</span>
-                        </div>
-                    )}
-
-                    {quote.spot_discount_amount > 0 && (
-                        <div className="flex justify-between items-center py-1 text-slate-400">
-                            <span>Spot / Preemptible Discount</span>
-                            <span className="text-green-400">- ${quote.spot_discount_amount.toFixed(2)}</span>
-                        </div>
-                    )}
-
-                    <div className="flex justify-between items-center py-2 mt-2 border-t border-slate-700">
-                        <span className="text-slate-300 font-semibold uppercase tracking-wider text-xs font-sans">Final Computed Quote</span>
-                        <div className="text-right">
-                            <span className="text-white font-bold">${quote.base_price_per_hour.toFixed(2)} /hr</span>
-                            <span className={`text-xs ml-2 ${quote.margin_percentage < 0 ? 'text-red-400' : 'text-slate-500'}`}>
-                                ({(quote.margin_percentage * 100).toFixed(0)}% margin)
-                            </span>
-                        </div>
-                    </div>
-                    
-                    {/* Agent Intervention */}
-                    <div className={`flex justify-between items-center py-2 mt-1 border-t-2 border-dashed ${getBorderColor()}`}>
-                        <span className={`font-semibold uppercase tracking-wider text-xs font-sans flex items-center gap-2 ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                            </svg>
-                            Agent Evaluated Price
-                        </span>
-                        <span className={`font-bold text-lg ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
-                            ${decision.final_price_per_hour.toFixed(2)} /hr
-                        </span>
-                    </div>
-                </div>
+            <div className={`flex justify-between items-center py-2 mt-2 mb-2 bg-slate-900/40 rounded px-4 border border-dashed ${getBorderColor()}`}>
+                <span className={`font-semibold uppercase tracking-wider text-xs font-sans flex items-center gap-2 ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                    Final Executed Price
+                </span>
+                <span className={`font-bold text-lg ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
+                    ${decision.final_price_per_hour.toFixed(2)} /hr
+                </span>
             </div>
 
             {/* Glass Box Explanation */}

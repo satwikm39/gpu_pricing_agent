@@ -3,3 +3,6 @@ uvicorn
 pydantic
 langchain-openai
 python-dotenv
+langgraph
+sse-starlette
+httpx

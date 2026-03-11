@@ -48,11 +48,6 @@ class EnvironmentUpdate(BaseModel):
 class ChaosEvent(BaseModel):
     scenario: str # 'predictable', 'demand_spike', 'market_slump'
 
-@app.get("/api/tick")
-async def run_tick():
-    """Executes one tick of the simulation and returns the result."""
-    return simulator.run_tick_api()
-
 @app.get("/api/settings")
 async def get_settings():
     """Returns exactly what is set in the simulator currently."""
@@ -67,8 +62,13 @@ async def get_metrics():
         "evictions": simulator.evictions,
         "rejected_deals": simulator.rejected_deals,
         "hardware_cost": simulator.hardware_cost,
-        "roi_percentage": (simulator.total_revenue / simulator.hardware_cost) * 100 if simulator.hardware_cost > 0 else 0
     }
+
+@app.post("/api/metrics/reset")
+async def reset_metrics():
+    """Resets the backend metrics tracking counters."""
+    simulator.reset_metrics()
+    return {"status": "success", "message": "Metrics reset"}
 
 @app.post("/api/settings")
 async def update_settings(settings: SettingsUpdate):
@@ -99,11 +99,23 @@ async def trigger_chaos_event(event: ChaosEvent):
     simulator.current_market_scenario = event.scenario
     return {"status": "success", "scenario": simulator.current_market_scenario}
 
+from sse_starlette.sse import EventSourceResponse
+
+
+@app.get("/api/tick/stream")
+async def run_tick_stream():
+    """Executes one tick of the simulation and streams the multi-agent thought process."""
+    # Wrap the generator to yield standard SSE string formats or dicts expected by EventSourceResponse
+    async def sse_generator():
+        async for chunk_json in simulator.run_tick_stream():
+            yield {"data": chunk_json}
+    
+    return EventSourceResponse(sse_generator())
+
+# Legacy calculate endpoint removed since multi-agent handles raw data directly.
 @app.post("/api/calculate")
 async def calculate_static(payload: StaticCalculationPayload):
-    """Calculates the static base price and margin breakdown without running the agent."""
-    quote = simulator.calculator.calculate_quote(payload.request, payload.state)
-    return {"quote": quote.model_dump()}
+    return {"error": "Static calculation is deprecated in favor of the multi-agent graph."}
 
 if __name__ == "__main__":
     import uvicorn

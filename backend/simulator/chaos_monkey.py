@@ -2,17 +2,13 @@ import time
 import random
 import uuid
 import os
+import json
 from dotenv import load_dotenv
 
-from core.models import LeaseRequest, GPUState
-from core.calculator import ComputationLayer
-from core.agent import PolicyAgent
+from core.models import LeaseRequest, GPUState, AgentDecision
+from core.multi_agent import multi_agent_app, AgenticState
 
 from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.live import Live
-from rich.layout import Layout
 
 # Load env for OpenAI API Key
 load_dotenv()
@@ -21,9 +17,6 @@ console = Console()
 
 class ChaosMonkeySimulator:
     def __init__(self):
-        self.calculator = ComputationLayer()
-        self.agent = PolicyAgent(api_key=os.getenv("OPENAI_API_KEY"))
-        
         # Internal State tracking
         self.total_revenue = 0.0
         self.evictions = 0
@@ -100,19 +93,17 @@ class ChaosMonkeySimulator:
         )
 
     def generate_stochastic_request(self, state: GPUState) -> LeaseRequest:
-        # Chaos Logic: If inventory is 0, someone REALLY wants an On-Demand instance
         if self.current_market_scenario == "demand_spike" or state.available_inventory == 0:
             wt = "On-Demand"
         elif self.current_market_scenario == "market_slump":
-            wt = "Spot" # Everyone is cheap
+            wt = "Spot"
         else:
             wt = random.choices(["On-Demand", "Spot"], weights=[0.4, 0.6])[0]
             
-        # Determine bid price for spot
         bid = 0.80
         if wt == "Spot":
             if self.current_market_scenario == "market_slump":
-                bid = random.uniform(0.10, 0.30) # Extremely low bids
+                bid = random.uniform(0.10, 0.30)
             else:
                 bid = random.uniform(0.60, 1.20)
             
@@ -126,109 +117,80 @@ class ChaosMonkeySimulator:
             bid_price_per_hour=bid if wt == "Spot" else None
         )
 
-    def run_tick(self):
+    async def run_tick_stream(self):
+        """
+        An async generator that streams the execution of the multi-agent graph.
+        Yields JSON strings ready for SSE.
+        """
         state = self.generate_random_state()
         request = self.generate_stochastic_request(state)
         
-        # 1. Computation Layer Calculates theoretical price
-        quote = self.calculator.calculate_quote(request, state)
-        
-        # 2. Agentic Policy Layer Evaluates the quote
-        start_time = time.time()
-        decision = self.agent.evaluate_quote(request, quote, state, self.policy_thresholds)
-        inference_time = time.time() - start_time
-        
-        # 3. Update Metrics
-        if decision.action in ["APPROVE", "OVERRIDE"]:
-            self.total_revenue += (decision.final_price_per_hour * request.quantity * request.duration_hours)
-        elif decision.action == "EVICT":
-            self.evictions += 1
-            self.trust_score = max(0, self.trust_score - 2) # SLA Penalty
-            self.total_revenue += (decision.final_price_per_hour * request.quantity * request.duration_hours)
-        else:
-            self.rejected_deals += 1
-
-        # 4. Rich UI Display
-        self.render_dashboard(state, request, quote, decision, inference_time)
-
-    def run_tick_api(self):
-        state = self.generate_random_state()
-        request = self.generate_stochastic_request(state)
-        
-        # 1. Computation Layer Calculates theoretical price
-        quote = self.calculator.calculate_quote(request, state)
-        
-        # 2. Agentic Policy Layer Evaluates the quote
-        start_time = time.time()
-        decision = self.agent.evaluate_quote(request, quote, state, self.policy_thresholds)
-        inference_time = time.time() - start_time
-        
-        # 3. Update Metrics
-        if decision.action in ["APPROVE", "OVERRIDE"]:
-            self.total_revenue += (decision.final_price_per_hour * request.quantity * request.duration_hours)
-        elif decision.action == "EVICT":
-            self.evictions += 1
-            self.trust_score = max(0, self.trust_score - 2) # SLA Penalty
-            self.total_revenue += (decision.final_price_per_hour * request.quantity * request.duration_hours)
-        else:
-            self.rejected_deals += 1
-
-        return {
-            "state": state.model_dump(),
+        # Send an initial event to the UI so it can display the request context immediately
+        initial_data = {
+            "type": "initial",
             "request": request.model_dump(),
-            "quote": quote.model_dump(),
-            "decision": decision.model_dump(),
-            "metrics": {
-                "total_revenue": self.total_revenue,
-                "evictions": self.evictions,
-                "trust_score": self.trust_score,
-                "rejected_deals": self.rejected_deals,
-                "hardware_cost": self.hardware_cost,
-                "roi_percentage": (self.total_revenue / self.hardware_cost) * 100 if self.hardware_cost > 0 else 0
-            },
-            "inference_time": inference_time
+            "state": state.model_dump()
         }
+        yield json.dumps(initial_data)
+        
+        graph_input: AgenticState = {
+            "request": request,
+            "gpu_state": state,
+            "policy_thresholds": self.policy_thresholds,
+            "thoughts": []
+        }
+        
+        # Astream yields updates from nodes as they finish
+        async for event in multi_agent_app.astream(graph_input, stream_mode="updates"):
+            for node_name, node_update in event.items():
+                if "thoughts" in node_update and len(node_update["thoughts"]) > 0:
+                    # Send the latest thought generated by this node
+                    latest_thought = node_update["thoughts"][-1]
+                    yield json.dumps({
+                        "type": "thought",
+                        "node": node_name,
+                        "thought": latest_thought.model_dump()
+                    })
+                
+                if "final_decision" in node_update and node_update["final_decision"]:
+                    decision_dict = node_update["final_decision"]
+                    decision_obj = AgentDecision(**decision_dict)
+                    
+                    # Update internal Simulator Metrics upon Judge completion
+                    self._update_metrics(decision_obj, request)
+                    
+                    yield json.dumps({
+                        "type": "final_decision",
+                        "node": node_name,
+                        "decision": decision_dict,
+                        "metrics": {
+                            "total_revenue": self.total_revenue,
+                            "evictions": self.evictions,
+                            "trust_score": self.trust_score,
+                            "rejected_deals": self.rejected_deals,
+                            "hardware_cost": self.hardware_cost,
+                            "roi_percentage": (self.total_revenue / self.hardware_cost) * 100 if self.hardware_cost > 0 else 0
+                        }
+                    })
 
-    def render_dashboard(self, state, request, quote, decision, inference_time):
-        table = Table(title=f"Deal Desk Event: {request.request_id}", show_header=False)
-        table.add_column("Key", style="cyan")
-        table.add_column("Value", style="magenta")
-        
-        table.add_row("Context", f"Available: {state.available_inventory}/1000 | Type: {request.workload_type}")
-        table.add_row("Raw Computed Quote", f"${quote.base_price_per_hour}/hr (Margin: {int(quote.margin_percentage*100)}%)")
-        table.add_row("Live Market Pulse", f"${state.market_price_per_hour:.2f}/hr (from {state.market_competitor_name})")
-        
-        action_color = "green" if decision.action == "APPROVE" else "yellow" if decision.action == "OVERRIDE" else "red"
-        
-        table.add_row("Agent Action", f"[{action_color}]{decision.action}[/{action_color}]")
-        table.add_row("Final Price", f"${decision.final_price_per_hour}/hr")
-        
-        # Glass-Box Explanation
-        explanation = f"[bold italic white]{decision.explanation}[/bold italic white]"
-        table.add_row("Glass-Box Logic", explanation)
-        
-        metrics = Table.grid(padding=1)
-        metrics.add_row(f"💰 Revenue: ${self.total_revenue:,.2f}  |  🤝 Trust Score: {self.trust_score}/100  |  🛑 Evictions: {self.evictions}")
-        
-        panel = Panel(
-            table,
-            title=f"🤖 GPU Pricing Agent ({inference_time:.2f}s)",
-            subtitle=metrics,
-            border_style="blue"
-        )
-        
-        console.print(panel)
-        console.print("\n")
+    def _update_metrics(self, decision, request):
+        if decision.action in ["APPROVE", "OVERRIDE"]:
+            self.total_revenue += (decision.final_price_per_hour * request.quantity * request.duration_hours)
+        elif decision.action == "EVICT":
+            self.evictions += 1
+            self.trust_score = max(0, self.trust_score - 2)
+            self.total_revenue += (decision.final_price_per_hour * request.quantity * request.duration_hours)
+        else:
+            self.rejected_deals += 1
+
+    def reset_metrics(self):
+        self.total_revenue = 0.0
+        self.evictions = 0
+        self.trust_score = 100
+        self.rejected_deals = 0
+        self.hardware_cost = 250000.0
 
 if __name__ == "__main__":
-    console.print("[bold green]Starting Stochastic GPU Leasing Simulation...[/bold green]")
-    console.print(f"Loaded Policies: Min Margin=15%, Scarcity Threshold=10%\n")
-    sim = ChaosMonkeySimulator()
-    
-    try:
-        for _ in range(5): # Run 5 ticks for the demo
-            sim.run_tick()
-            time.sleep(1)
-    except KeyboardInterrupt:
-        console.print("\n[bold red]Simulation Halted.[/bold red]")
+    console.print("[bold green]Starting Simulator...[/bold green]")
+
 
