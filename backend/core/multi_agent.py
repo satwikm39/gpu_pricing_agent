@@ -53,7 +53,7 @@ Establish a raw baseline price using `GPU_State.depreciation_cost_per_hour` and 
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a VERY brief 1-sentence summary of your calculated price. BE EXTREMELY CONCISE."""
+OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence analysis. Use professional executive and financial terminology (e.g., OPEX, depreciation amortization, baseline margin thresholds)."""
     return await generate_thought("Pricing Base Agent", sys_prompt, state)
 
 async def negative_agent(state: AgenticState):
@@ -62,7 +62,7 @@ Find reasons why we SHOULD NOT discount this deal or why we should reject. Focus
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a VERY brief 1-sentence conservative perspective. BE EXTREMELY CONCISE."""
+OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence risk analysis. Use professional executive terminology focusing on downside mitigation, margin erosion, and revenue protection."""
     return await generate_thought("Conservative Risk Agent", sys_prompt, state)
 
 async def positive_agent(state: AgenticState):
@@ -71,7 +71,7 @@ Find reasons to say YES, discount aggressively (if `cost_recovered`), or surge p
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a VERY brief 1-sentence opportunistic perspective. BE EXTREMELY CONCISE."""
+OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence growth analysis. Use professional executive terminology focusing on yield maximization, strategic discounting for volume, or capitalizing on market scarcity."""
     return await generate_thought("Opportunistic Growth Agent", sys_prompt, state)
 
 async def market_monitor_agent(state: AgenticState):
@@ -80,7 +80,7 @@ Compare our situation with `market_competitor_name` and check the `max_market_pr
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a VERY brief 1-sentence competitive analysis. BE EXTREMELY CONCISE."""
+OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence competitive analysis. Use professional executive terminology focusing on market share, premium positioning, and competitor price elasticity."""
     return await generate_thought("Market Monitor Agent", sys_prompt, state)
 
 async def inventory_agent(state: AgenticState):
@@ -89,7 +89,7 @@ Look at inventory vs requested GPUs. Should we buy/retire?
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a VERY brief 1-sentence suggestion. BE EXTREMELY CONCISE."""
+OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence capacity strategy. Use professional executive terminology focusing on utilization rates, CapEx optimization, and fleet lifecycle management."""
     return await generate_thought("Capacity Agent", sys_prompt, state)
 
 async def judge_agent(state: AgenticState):
@@ -132,7 +132,7 @@ Given the Supreme Judge's final decision, perform a quick what-if scenario analy
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a VERY brief 2-sentence scenario analysis. BE EXTREMELY CONCISE."""
+OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence scenario analysis. Use professional executive terminology focusing on sensitivity analysis, opportunity cost, and policy impact."""
     return await generate_thought("Policy Analyst", sys_prompt, state)
 
 async def policy_critique_agent(state: AgenticState):
@@ -141,7 +141,7 @@ Look at the Analyst's what-if scenario and the current policies. Critique the cu
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a VERY brief 2-sentence critique. BE EXTREMELY CONCISE."""
+OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence policy critique. Use professional executive terminology focusing on strategic alignment, margin impact, and structural policy recommendations."""
     return await generate_thought("Policy Critique", sys_prompt, state)
 
 # --- BUILD GRAPH ---
