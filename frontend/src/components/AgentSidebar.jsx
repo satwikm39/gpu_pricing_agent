@@ -48,15 +48,19 @@ const ThoughtCard = ({ item }) => {
                 {item.thought.agent_name}
             </h3>
             <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">
-                {suggestion && (
-                    <div className="mb-3 px-3 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg flex items-center gap-2.5 animate-pulse-subtle">
-                        <div className="bg-violet-500 p-1 rounded-md">
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor font-bold">
+                {suggestion && item.node === 'critique' && (
+                    <div className="mb-4 px-3 py-2.5 bg-violet-500/10 border border-violet-500/30 rounded-xl flex items-start gap-3 animate-pulse-subtle">
+                        <div className="bg-violet-500 p-1.5 rounded-lg shrink-0 mt-0.5 shadow-[0_0_10px_rgba(139,92,246,0.5)]">
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor font-bold">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                         </div>
-                        <span className="text-[11px] font-bold text-violet-300 uppercase tracking-widest whitespace-nowrap">Recommended Adjustment:</span>
-                        <span className="text-sm font-mono font-bold text-white bg-violet-900/40 px-2 py-0.5 rounded border border-violet-500/20">{suggestion}</span>
+                        <div className="flex flex-col gap-1 min-w-0">
+                            <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">Policy Suggestion</span>
+                            <span className="text-sm font-mono font-bold text-white break-all leading-tight">
+                                {suggestion}
+                            </span>
+                        </div>
                     </div>
                 )}
                 <p className="font-medium text-slate-100">{summary}</p>
@@ -80,7 +84,7 @@ const ThoughtCard = ({ item }) => {
     );
 };
 
-const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay }) => {
+const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onViewComparison, hasComparison }) => {
     const endRef = useRef(null);
     const [replayOpen, setReplayOpen] = useState(false);
     const [replayPolicies, setReplayPolicies] = useState({
@@ -233,9 +237,21 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay }) => 
                             </div>
                         )}
 
-                        {/* POLICY RE-RUN TRIGGER — appears after deal completes */}
+                                    {/* POLICY RE-RUN TRIGGER — appears after deal completes */}
                         {finalDecision && lastDealContext && !isThinking && (
-                            <div className="mt-6 relative z-10">
+                            <div className="mt-6 relative z-10 flex flex-col gap-3">
+                                {hasComparison && (
+                                    <button
+                                        onClick={onViewComparison}
+                                        className="w-full py-4 px-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-[12px] uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2.5 shadow-[0_0_20px_rgba(16,185,129,0.1)] hover:shadow-[0_0_25px_rgba(16,185,129,0.2)] animate-slide-up"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                        </svg>
+                                        View Impact Comparison
+                                    </button>
+                                )}
+
                                 {!replayOpen ? (
                                     <button
                                         onClick={() => setReplayOpen(true)}

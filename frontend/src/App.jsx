@@ -186,7 +186,7 @@ function App() {
                         const initialEvent = currentStream.find(d => d.type === 'initial');
                         const replayPolicies = initialEvent?.replay_policies || policyOverrides;
                         setComparisonData({
-                            dealRequest: lastDealContext?.request,
+                            dealRequest: lastDealContext.request,
                             original: originalDecisionRef.current || {},
                             replay: {
                                 action: data.decision.action,
@@ -195,7 +195,8 @@ function App() {
                                 policies: replayPolicies
                             }
                         });
-                        setComparisonOpen(true);
+                        // User requested NO auto-popup. The button in sidebar will handle it.
+                        // setComparisonOpen(true);
                     }
                 } catch (e) { console.error('Parse error on replay chunk', e); }
             }
@@ -469,6 +470,8 @@ function App() {
                         isThinking={isThinking}
                         lastDealContext={lastDealContext}
                         onReplay={handleReplay}
+                        onViewComparison={() => setComparisonOpen(true)}
+                        hasComparison={!!comparisonData}
                     />
                 </div>
             </div>
