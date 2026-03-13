@@ -84,13 +84,19 @@ OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence competitive anal
     return await generate_thought("Market Monitor Agent", sys_prompt, state)
 
 async def inventory_agent(state: AgenticState):
-    sys_prompt = """You are the **Capacity & CapEx Agent**.
-Look at inventory vs requested GPUs. Should we buy/retire?
+    sys_prompt = """You are the **Inventory/Capacity Agent**.
+Analyze the current fleet status and market demand. Determine if we have excess capacity or a supply crunch.
+
+If availability is < 10% and demand is high, suggest BUYING more units.
+If availability is > 70% for sustained periods, suggest DECOMMISSIONING (SELLING) units.
+
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence capacity strategy. Use professional executive terminology focusing on utilization rates, CapEx optimization, and fleet lifecycle management."""
-    return await generate_thought("Capacity Agent", sys_prompt, state)
+OUTPUT INSTRUCTION: Provide a concise 2-sentence inventory status report.
+Include a specific recommendation in the format: [CAPACITY_ACTION: BUY X UNITS] or [CAPACITY_ACTION: SELL X UNITS].
+Choose X based on the current context (e.g. 100-500 units)."""
+    return await generate_thought("Inventory Agent", sys_prompt, state)
 
 async def judge_agent(state: AgenticState):
     # This agent outputs structured JSON, so we treat it differently.
@@ -138,11 +144,22 @@ OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence scenario analysi
 async def policy_critique_agent(state: AgenticState):
     sys_prompt = """You are the **Policy Critique Agent**.
 Look at the Analyst's what-if scenario and the current policies. Critique the current settings and suggest a better policy tweak.
+
+CRITICAL CONSTRAINT: You may ONLY suggest tweaks for the following 6 keys:
+1. min_margin (e.g. 10%)
+2. scarcity_threshold (e.g. 15)
+3. scarcity_multiplier (e.g. 2.0x)
+4. max_market_premium (e.g. 25%)
+5. eviction_delta (e.g. $2.00)
+6. post_roi_discount_floor (e.g. 40%)
+
+Do NOT suggest hardware expansion or "dynamic inventory" here; that is for the Inventory Agent.
+
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence policy critique. Use professional executive terminology.
-At the end of your critique, provide a specific policy suggestion in the format: [SUGGESTION: key=value]
+OUTPUT INSTRUCTION: Provide a concise but detailed 2-3 sentence policy critique. 
+At the end, provide a specific policy suggestion in the format: [SUGGESTION: key=value]
 (e.g., [SUGGESTION: min_margin=10%] or [SUGGESTION: scarcity_multiplier=1.5x])"""
     return await generate_thought("Policy Critique", sys_prompt, state)
 

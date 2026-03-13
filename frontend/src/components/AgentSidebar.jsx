@@ -31,6 +31,10 @@ const ThoughtCard = ({ item }) => {
     const suggestionMatch = item.thought.content.match(/\[SUGGESTION:\s*([^\]]+)\]/);
     const suggestion = suggestionMatch ? suggestionMatch[1] : null;
 
+    // Extract capacity action if present: [CAPACITY_ACTION: action X UNITS]
+    const capacityMatch = item.thought.content.match(/\[CAPACITY_ACTION:\s*([^\]]+)\]/);
+    const capacityAction = capacityMatch ? capacityMatch[1] : null;
+
     let styleClass = 'glass-card border-white/5';
     let textClass = 'text-primary-400';
     if (isJudge) {
@@ -47,7 +51,7 @@ const ThoughtCard = ({ item }) => {
                 <span className="text-lg bg-black/20 p-1.5 rounded-lg border border-white/5 shadow-inner">{icon}</span> 
                 {item.thought.agent_name}
             </h3>
-            <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">
+            <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-sans break-words">
                 {suggestion && item.node === 'critique' && (
                     <div className="mb-4 px-3 py-2.5 bg-violet-500/10 border border-violet-500/30 rounded-xl flex items-start gap-3 animate-pulse-subtle">
                         <div className="bg-violet-500 p-1.5 rounded-lg shrink-0 mt-0.5 shadow-[0_0_10px_rgba(139,92,246,0.5)]">
@@ -55,10 +59,26 @@ const ThoughtCard = ({ item }) => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                         </div>
-                        <div className="flex flex-col gap-1 min-w-0">
+                        <div className="flex flex-col gap-1 min-w-0 flex-1">
                             <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">Policy Suggestion</span>
-                            <span className="text-sm font-mono font-bold text-white break-all leading-tight">
+                            <span className="text-sm font-mono font-bold text-white break-words leading-tight">
                                 {suggestion}
+                            </span>
+                        </div>
+                    </div>
+                )}
+
+                {capacityAction && (
+                    <div className="mb-4 px-3 py-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-start gap-3 animate-pulse-subtle">
+                        <div className="bg-emerald-500 p-1.5 rounded-lg shrink-0 mt-0.5 shadow-[0_0_10px_rgba(16,185,129,0.5)]">
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor font-bold">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                        </div>
+                        <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Capacity Recommendation</span>
+                            <span className="text-sm font-mono font-bold text-white break-words leading-tight">
+                                {capacityAction}
                             </span>
                         </div>
                     </div>
@@ -67,8 +87,8 @@ const ThoughtCard = ({ item }) => {
                 {rest && (
                     <div className="mt-3">
                         {expanded && (
-                            <div className="mt-3 text-slate-400 border-t border-white/10 pt-3 animate-fade-in text-[13px] leading-relaxed">
-                                {rest.replace(/\[SUGGESTION:[^\]]+\]/g, '').trim()}
+                            <div className="mt-3 text-slate-400 border-t border-white/10 pt-3 animate-fade-in text-[13px] leading-relaxed break-words">
+                                {rest.replace(/\[(SUGGESTION|CAPACITY_ACTION):[^\]]+\]/g, '').trim()}
                             </div>
                         )}
                         <button 
