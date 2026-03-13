@@ -23,6 +23,7 @@ function App() {
   const [chartData, setChartData] = useState([]) // Historical data for Recharts
   const [savedRuns, setSavedRuns] = useState([]) // Array of saved scenario runs
   const [notifications] = useState([]) // Toast notifications
+  const [lastDealContext, setLastDealContext] = useState(null) // Stores last {request, state} for policy replay
   
   const [loading, setLoading] = useState(false)
   const [isAutoRunning, setIsAutoRunning] = useState(false)
@@ -92,7 +93,19 @@ function App() {
                                 metrics: data.metrics
                             };
                             
-                            setFeed(prev => [mockTick, ...prev]);
+                            // Capture the last deal context for policy re-run feature
+                            const initialEvent = currentStream.find(d => d.type === 'initial');
+                            if (initialEvent && !data.is_replay) {
+                                setLastDealContext({
+                                    request: initialEvent.request,
+                                    state: initialEvent.state
+                                });
+                            }
+                            
+                            // Don't add replay runs to the Live Feed, only real ticks
+                            if (!data.is_replay) {
+                                setFeed(prev => [mockTick, ...prev]);
+                            }
                             
                             setChartData(prev => {
                                 const st = mockTick.state;
@@ -120,6 +133,53 @@ function App() {
         setIsThinking(false)
     }
   }, [loading, isThinking]);
+
+  const handleReplay = useCallback(async (policyOverrides) => {
+    if (!lastDealContext || loading || isThinking) return;
+
+    setLoading(true);
+    setIsThinking(true);
+    setAgentStreamData([]);
+    let currentStream = [];
+
+    try {
+        const response = await fetch('http://localhost:8000/api/tick/replay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                request: lastDealContext.request,
+                state: lastDealContext.state,
+                policy_overrides: policyOverrides
+            })
+        });
+
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            for (const line of chunk.split('\n')) {
+                if (!line.startsWith('data: ')) continue;
+                const dataStr = line.replace('data: ', '').trim();
+                if (!dataStr) continue;
+                try {
+                    const data = JSON.parse(dataStr);
+                    currentStream.push(data);
+                    setAgentStreamData([...currentStream]);
+                } catch (e) { console.error('Parse error on replay chunk', e); }
+            }
+        }
+    } catch (err) {
+        console.error('Replay failed', err);
+    } finally {
+        setLoading(false);
+        setIsThinking(false);
+    }
+  }, [lastDealContext, loading, isThinking]);
 
   // Handle auto-run interval
   useEffect(() => {
@@ -377,7 +437,12 @@ function App() {
                 
                 {/* Right Column: Agent Reasoning Sidebar */}
                 <div className="w-full xl:w-[420px] 2xl:w-[480px] shrink-0 h-full z-30">
-                    <AgentSidebar streamData={agentStreamData} isThinking={isThinking} />
+                    <AgentSidebar 
+                        streamData={agentStreamData} 
+                        isThinking={isThinking}
+                        lastDealContext={lastDealContext}
+                        onReplay={handleReplay}
+                    />
                 </div>
             </div>
         </div>

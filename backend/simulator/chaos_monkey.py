@@ -173,6 +173,65 @@ class ChaosMonkeySimulator:
                         }
                     })
 
+    async def run_replay_stream(self, request: LeaseRequest, state: GPUState, policy_overrides: dict = None):
+        """
+        Replays the exact same request+state through the multi-agent graph under
+        (optionally) different policy thresholds. Does NOT update simulator metrics.
+        This is a pure "what-if" analysis stream.
+        """
+        # Merge current policies with any overrides
+        policies = {**self.policy_thresholds}
+        if policy_overrides:
+            policies.update(policy_overrides)
+
+        # Re-emit the initial context so the frontend can display the deal card
+        initial_data = {
+            "type": "initial",
+            "request": request.model_dump(),
+            "state": state.model_dump(),
+            "is_replay": True,
+            "replay_policies": policies
+        }
+        yield json.dumps(initial_data)
+
+        graph_input: AgenticState = {
+            "request": request,
+            "gpu_state": state,
+            "policy_thresholds": policies,
+            "thoughts": []
+        }
+
+        # Run the same multi-agent graph with frozen state
+        async for event in multi_agent_app.astream(graph_input, stream_mode="updates"):
+            for node_name, node_update in event.items():
+                if "thoughts" in node_update and len(node_update["thoughts"]) > 0:
+                    latest_thought = node_update["thoughts"][-1]
+                    yield json.dumps({
+                        "type": "thought",
+                        "node": node_name,
+                        "thought": latest_thought.model_dump(),
+                        "is_replay": True
+                    })
+
+                if "final_decision" in node_update and node_update["final_decision"]:
+                    decision_dict = node_update["final_decision"]
+                    # NOTE: We intentionally do NOT call _update_metrics here —
+                    # this is a hypothetical replay, not a real executed deal.
+                    yield json.dumps({
+                        "type": "final_decision",
+                        "node": node_name,
+                        "decision": decision_dict,
+                        "is_replay": True,
+                        "metrics": {
+                            "total_revenue": self.total_revenue,
+                            "evictions": self.evictions,
+                            "trust_score": self.trust_score,
+                            "rejected_deals": self.rejected_deals,
+                            "hardware_cost": self.hardware_cost,
+                            "roi_percentage": (self.total_revenue / self.hardware_cost) * 100 if self.hardware_cost > 0 else 0
+                        }
+                    })
+
     def _update_metrics(self, decision, request):
         if decision.action in ["APPROVE", "OVERRIDE"]:
             self.total_revenue += (decision.final_price_per_hour * request.quantity * request.duration_hours)

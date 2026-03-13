@@ -45,6 +45,18 @@ const LiveFeed = ({ data }) => {
                                 Active Spot: {state.active_spot_leases}
                             </span>
                         )}
+                        {/* Cost Recovery Status — drives Policy D (Lifecycle Aggression) */}
+                        {state.cost_recovered ? (
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded border bg-emerald-500/15 text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.15)] flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.9)] animate-pulse"></span>
+                                CapEx Recovered · Pure Profit Mode
+                            </span>
+                        ) : (
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded border bg-amber-500/10 text-amber-400/80 border-amber-500/20 flex items-center gap-1.5">
+                                <svg className="w-3 h-3 text-amber-400/70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                Recovering CapEx
+                            </span>
+                        )}
                         {state.market_price_per_hour && (
                             <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-pink-500/10 text-pink-400 border-pink-500/30 animate-pulse-slow">
                                 <div className="w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_5px_rgba(236,72,153,0.8)]"></div>

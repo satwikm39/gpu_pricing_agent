@@ -100,6 +100,29 @@ async def trigger_chaos_event(event: ChaosEvent):
     return {"status": "success", "scenario": simulator.current_market_scenario}
 
 from sse_starlette.sse import EventSourceResponse
+from typing import Optional, Dict, Any
+
+class ReplayPayload(BaseModel):
+    request: LeaseRequest
+    state: GPUState
+    policy_overrides: Optional[Dict[str, Any]] = None
+
+@app.post("/api/tick/replay")
+async def replay_tick_stream(payload: ReplayPayload):
+    """
+    Replays a specific frozen request+state through the multi-agent graph
+    with optional policy overrides. Streams SSE output exactly like /api/tick/stream.
+    Does NOT update simulator metrics — this is a pure what-if analysis.
+    """
+    async def sse_generator():
+        async for chunk_json in simulator.run_replay_stream(
+            request=payload.request,
+            state=payload.state,
+            policy_overrides=payload.policy_overrides
+        ):
+            yield {"data": chunk_json}
+
+    return EventSourceResponse(sse_generator())
 
 
 @app.get("/api/tick/stream")

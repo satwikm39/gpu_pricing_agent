@@ -65,8 +65,14 @@ const ThoughtCard = ({ item }) => {
     );
 };
 
-const AgentSidebar = ({ streamData, isThinking }) => {
+const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay }) => {
     const endRef = useRef(null);
+    const [replayOpen, setReplayOpen] = useState(false);
+    const [replayPolicies, setReplayPolicies] = useState({
+        min_margin: '15%',
+        scarcity_threshold: '10',
+        max_market_premium: '20%'
+    });
 
     const thoughts = streamData.filter(d => d.type === 'thought');
     const dealThoughts = thoughts.filter(t => !['analyst', 'critique'].includes(t.node));
@@ -95,6 +101,13 @@ const AgentSidebar = ({ streamData, isThinking }) => {
                     </div>
                     Agent Workflow
                 </span>
+                {/* Replay badge */}
+                {streamData.some(d => d.is_replay) && (
+                    <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg border bg-violet-500/20 text-violet-300 border-violet-500/40 flex items-center gap-1.5 animate-pulse">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        Policy Replay
+                    </span>
+                )}
             </h2>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-6 border-transparent relative">
@@ -199,6 +212,81 @@ const AgentSidebar = ({ streamData, isThinking }) => {
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* POLICY RE-RUN TRIGGER — appears after deal completes */}
+                        {finalDecision && lastDealContext && !isThinking && (
+                            <div className="mt-6 relative z-10">
+                                {!replayOpen ? (
+                                    <button
+                                        onClick={() => setReplayOpen(true)}
+                                        className="w-full py-3 px-4 rounded-xl border border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 font-bold text-[12px] uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2.5 shadow-[0_0_20px_rgba(139,92,246,0.1)] hover:shadow-[0_0_25px_rgba(139,92,246,0.2)]"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                        Re-Run with Different Policies
+                                    </button>
+                                ) : (
+                                    <div className="rounded-xl border border-violet-500/40 bg-slate-900/80 overflow-hidden animate-fade-in shadow-[0_4px_30px_rgba(139,92,246,0.15)]">
+                                        <div className="px-5 py-4 bg-violet-900/20 border-b border-violet-500/20 flex items-center justify-between">
+                                            <span className="text-violet-300 font-bold text-[11px] uppercase tracking-[0.2em] flex items-center gap-2">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                Policy Wargame — Replay
+                                            </span>
+                                            <button onClick={() => setReplayOpen(false)} className="text-slate-500 hover:text-slate-300 text-lg leading-none">&times;</button>
+                                        </div>
+                                        <div className="p-5 flex flex-col gap-4">
+                                            <p className="text-slate-400 text-[11px] leading-relaxed">Same request, same market state &mdash; different rules. Adjust the policy levers below and fire the replay.</p>
+                                            
+                                            {/* Min Margin */}
+                                            <div>
+                                                <div className="flex justify-between text-[11px] mb-1.5">
+                                                    <label className="text-slate-400 font-bold uppercase tracking-wider">Min Margin Floor</label>
+                                                    <span className="font-mono text-violet-300 font-bold">{replayPolicies.min_margin}</span>
+                                                </div>
+                                                <input type="range" min="0" max="50" step="1"
+                                                    value={parseInt(replayPolicies.min_margin)}
+                                                    onChange={e => setReplayPolicies(p => ({...p, min_margin: `${e.target.value}%`}))}
+                                                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                                                />
+                                            </div>
+                                            
+                                            {/* Scarcity Threshold */}
+                                            <div>
+                                                <div className="flex justify-between text-[11px] mb-1.5">
+                                                    <label className="text-slate-400 font-bold uppercase tracking-wider">Scarcity Threshold</label>
+                                                    <span className="font-mono text-violet-300 font-bold">{replayPolicies.scarcity_threshold}%</span>
+                                                </div>
+                                                <input type="range" min="0" max="50" step="5"
+                                                    value={parseInt(replayPolicies.scarcity_threshold)}
+                                                    onChange={e => setReplayPolicies(p => ({...p, scarcity_threshold: e.target.value}))}
+                                                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                                                />
+                                            </div>
+                                            
+                                            {/* Max Market Premium */}
+                                            <div>
+                                                <div className="flex justify-between text-[11px] mb-1.5">
+                                                    <label className="text-slate-400 font-bold uppercase tracking-wider">Max Market Premium</label>
+                                                    <span className="font-mono text-violet-300 font-bold">{replayPolicies.max_market_premium}</span>
+                                                </div>
+                                                <input type="range" min="0" max="100" step="5"
+                                                    value={parseInt(replayPolicies.max_market_premium)}
+                                                    onChange={e => setReplayPolicies(p => ({...p, max_market_premium: `${e.target.value}%`}))}
+                                                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                                                />
+                                            </div>
+
+                                            <button
+                                                onClick={() => { onReplay(replayPolicies); setReplayOpen(false); }}
+                                                className="w-full mt-1 py-3 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold text-[12px] uppercase tracking-widest transition-all duration-300 shadow-[0_4px_20px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                                Fire Replay
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
