@@ -56,6 +56,10 @@ function App() {
     setLoading(true)
     setIsThinking(true)
     setAgentStreamData([])
+    setFinalDecision(null) // Reset decision
+    setComparisonData(null) // Wipe stale comparison
+    setComparisonOpen(false) // Ensure modal is closed
+    
     let currentStream = [];
     
     try {

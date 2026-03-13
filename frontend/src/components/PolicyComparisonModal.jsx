@@ -23,8 +23,13 @@ const ActionBadge = ({ action }) => {
     );
 };
 
+const normalizePolicy = (val) => {
+    if (val === undefined || val === null) return '';
+    return val.toString().replace(/[%$]/g, '').trim();
+};
+
 const DeltaTag = ({ original, replay }) => {
-    if (original === replay) return <span className="text-[10px] text-slate-500 ml-1">(no change)</span>;
+    if (normalizePolicy(original) === normalizePolicy(replay)) return <span className="text-[10px] text-slate-500 ml-1">(no change)</span>;
     return <span className="text-[10px] font-bold text-violet-400 ml-1 bg-violet-500/10 px-1.5 py-0.5 rounded">CHANGED</span>;
 };
 
@@ -167,7 +172,7 @@ const PolicyComparisonModal = ({ isOpen, onClose, comparison }) => {
                             {Object.entries(POLICY_LABELS).map(([key, meta]) => {
                                 const val = replay.policies?.[key];
                                 const origVal = original.policies?.[key];
-                                const changed = val !== origVal;
+                                const changed = normalizePolicy(val) !== normalizePolicy(origVal);
                                 return (
                                     <div key={key} className={`p-3 rounded-xl border transition-all ${changed ? 'bg-violet-900/20 border-violet-500/40 shadow-[0_0_15px_rgba(139,92,246,0.15)]' : 'bg-white/[0.02] border-white/5'}`}>
                                         <p className="text-[10px] uppercase tracking-widest font-bold mb-1 flex items-center gap-1.5">
