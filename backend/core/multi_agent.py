@@ -132,7 +132,9 @@ Given the Supreme Judge's final decision, perform a quick what-if scenario analy
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence scenario analysis. Use professional executive terminology focusing on sensitivity analysis, opportunity cost, and policy impact."""
+OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence scenario analysis. Use professional executive terminology. 
+At the end of your analysis, provide a specific policy suggestion in the format: [SUGGESTION: key=value] 
+(e.g., [SUGGESTION: min_margin=12%] or [SUGGESTION: scarcity_threshold=15%])"""
     return await generate_thought("Policy Analyst", sys_prompt, state)
 
 async def policy_critique_agent(state: AgenticState):
@@ -141,7 +143,9 @@ Look at the Analyst's what-if scenario and the current policies. Critique the cu
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence policy critique. Use professional executive terminology focusing on strategic alignment, margin impact, and structural policy recommendations."""
+OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence policy critique. Use professional executive terminology.
+At the end of your critique, provide a specific policy suggestion in the format: [SUGGESTION: key=value]
+(e.g., [SUGGESTION: min_margin=10%] or [SUGGESTION: scarcity_multiplier=1.5x])"""
     return await generate_thought("Policy Critique", sys_prompt, state)
 
 # --- BUILD GRAPH ---

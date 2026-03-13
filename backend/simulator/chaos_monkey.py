@@ -129,7 +129,8 @@ class ChaosMonkeySimulator:
         initial_data = {
             "type": "initial",
             "request": request.model_dump(),
-            "state": state.model_dump()
+            "state": state.model_dump(),
+            "policies": self.policy_thresholds
         }
         yield json.dumps(initial_data)
         

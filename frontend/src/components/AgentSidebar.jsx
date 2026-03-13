@@ -27,6 +27,10 @@ const ThoughtCard = ({ item }) => {
     const summary = sentences[0];
     const rest = sentences.slice(1).join(' ');
 
+    // Extract suggestion if present: [SUGGESTION: key=value]
+    const suggestionMatch = item.thought.content.match(/\[SUGGESTION:\s*([^\]]+)\]/);
+    const suggestion = suggestionMatch ? suggestionMatch[1] : null;
+
     let styleClass = 'glass-card border-white/5';
     let textClass = 'text-primary-400';
     if (isJudge) {
@@ -44,12 +48,23 @@ const ThoughtCard = ({ item }) => {
                 {item.thought.agent_name}
             </h3>
             <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                {suggestion && (
+                    <div className="mb-3 px-3 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg flex items-center gap-2.5 animate-pulse-subtle">
+                        <div className="bg-violet-500 p-1 rounded-md">
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor font-bold">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
+                        <span className="text-[11px] font-bold text-violet-300 uppercase tracking-widest whitespace-nowrap">Recommended Adjustment:</span>
+                        <span className="text-sm font-mono font-bold text-white bg-violet-900/40 px-2 py-0.5 rounded border border-violet-500/20">{suggestion}</span>
+                    </div>
+                )}
                 <p className="font-medium text-slate-100">{summary}</p>
                 {rest && (
                     <div className="mt-3">
                         {expanded && (
                             <div className="mt-3 text-slate-400 border-t border-white/10 pt-3 animate-fade-in text-[13px] leading-relaxed">
-                                {rest}
+                                {rest.replace(/\[SUGGESTION:[^\]]+\]/g, '').trim()}
                             </div>
                         )}
                         <button 
@@ -71,7 +86,10 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay }) => 
     const [replayPolicies, setReplayPolicies] = useState({
         min_margin: '15%',
         scarcity_threshold: '10',
-        max_market_premium: '20%'
+        scarcity_multiplier: '3.0',
+        max_market_premium: '20%',
+        eviction_delta: '1.50',
+        post_roi_discount_floor: '50%'
     });
 
     const thoughts = streamData.filter(d => d.type === 'thought');
@@ -236,8 +254,8 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay }) => 
                                             <button onClick={() => setReplayOpen(false)} className="text-slate-500 hover:text-slate-300 text-lg leading-none">&times;</button>
                                         </div>
                                         <div className="p-5 flex flex-col gap-4">
-                                            <p className="text-slate-400 text-[11px] leading-relaxed">Same request, same market state &mdash; different rules. Adjust the policy levers below and fire the replay.</p>
-                                            
+                                            <p className="text-slate-400 text-[11px] leading-relaxed">Same request, same market state &mdash; different rules. Adjust all 6 policy levers and fire the replay.</p>
+
                                             {/* Min Margin */}
                                             <div>
                                                 <div className="flex justify-between text-[11px] mb-1.5">
@@ -250,12 +268,12 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay }) => 
                                                     className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
                                                 />
                                             </div>
-                                            
+
                                             {/* Scarcity Threshold */}
                                             <div>
                                                 <div className="flex justify-between text-[11px] mb-1.5">
-                                                    <label className="text-slate-400 font-bold uppercase tracking-wider">Scarcity Threshold</label>
-                                                    <span className="font-mono text-violet-300 font-bold">{replayPolicies.scarcity_threshold}%</span>
+                                                    <label className="text-slate-400 font-bold uppercase tracking-wider">Scarcity Trigger</label>
+                                                    <span className="font-mono text-violet-300 font-bold">{replayPolicies.scarcity_threshold}% avail</span>
                                                 </div>
                                                 <input type="range" min="0" max="50" step="5"
                                                     value={parseInt(replayPolicies.scarcity_threshold)}
@@ -263,7 +281,20 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay }) => 
                                                     className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
                                                 />
                                             </div>
-                                            
+
+                                            {/* Scarcity Multiplier */}
+                                            <div>
+                                                <div className="flex justify-between text-[11px] mb-1.5">
+                                                    <label className="text-slate-400 font-bold uppercase tracking-wider">Scarcity Multiplier</label>
+                                                    <span className="font-mono text-violet-300 font-bold">{replayPolicies.scarcity_multiplier}x</span>
+                                                </div>
+                                                <input type="range" min="1" max="10" step="0.5"
+                                                    value={parseFloat(replayPolicies.scarcity_multiplier)}
+                                                    onChange={e => setReplayPolicies(p => ({...p, scarcity_multiplier: e.target.value}))}
+                                                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                                                />
+                                            </div>
+
                                             {/* Max Market Premium */}
                                             <div>
                                                 <div className="flex justify-between text-[11px] mb-1.5">
@@ -273,6 +304,32 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay }) => 
                                                 <input type="range" min="0" max="100" step="5"
                                                     value={parseInt(replayPolicies.max_market_premium)}
                                                     onChange={e => setReplayPolicies(p => ({...p, max_market_premium: `${e.target.value}%`}))}
+                                                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                                                />
+                                            </div>
+
+                                            {/* Eviction Delta */}
+                                            <div>
+                                                <div className="flex justify-between text-[11px] mb-1.5">
+                                                    <label className="text-slate-400 font-bold uppercase tracking-wider">Eviction Delta</label>
+                                                    <span className="font-mono text-violet-300 font-bold">${parseFloat(replayPolicies.eviction_delta.toString().replace('$', '')).toFixed(2)}</span>
+                                                </div>
+                                                <input type="range" min="0.25" max="5.00" step="0.25"
+                                                    value={parseFloat(replayPolicies.eviction_delta.toString().replace('$', ''))}
+                                                    onChange={e => setReplayPolicies(p => ({...p, eviction_delta: `$${parseFloat(e.target.value).toFixed(2)}`}))}
+                                                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                                                />
+                                            </div>
+
+                                            {/* Post-ROI Discount Floor */}
+                                            <div>
+                                                <div className="flex justify-between text-[11px] mb-1.5">
+                                                    <label className="text-slate-400 font-bold uppercase tracking-wider">Post-ROI Discount Floor</label>
+                                                    <span className="font-mono text-violet-300 font-bold">{replayPolicies.post_roi_discount_floor}</span>
+                                                </div>
+                                                <input type="range" min="0" max="90" step="5"
+                                                    value={parseInt(replayPolicies.post_roi_discount_floor)}
+                                                    onChange={e => setReplayPolicies(p => ({...p, post_roi_discount_floor: `${e.target.value}%`}))}
                                                     className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
                                                 />
                                             </div>

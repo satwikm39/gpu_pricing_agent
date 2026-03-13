@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import MetricCards from './components/MetricCards'
 import LiveFeed from './components/LiveFeed'
 import ROIMeter from './components/ROIMeter'
@@ -6,6 +6,7 @@ import PolicyControls from './components/PolicyControls'
 import TimeSeriesChart from './components/TimeSeriesChart'
 import FleetROIDistribution from './components/FleetROIDistribution'
 import AgentSidebar from './components/AgentSidebar'
+import PolicyComparisonModal from './components/PolicyComparisonModal'
 
 function App() {
   const [activeTab, setActiveTab] = useState('simulation') // 'simulation' or 'calculator'
@@ -24,6 +25,9 @@ function App() {
   const [savedRuns, setSavedRuns] = useState([]) // Array of saved scenario runs
   const [notifications] = useState([]) // Toast notifications
   const [lastDealContext, setLastDealContext] = useState(null) // Stores last {request, state} for policy replay
+  const [comparisonData, setComparisonData] = useState(null) // Stores side-by-side comparison results
+  const [comparisonOpen, setComparisonOpen] = useState(false)
+  const originalDecisionRef = useRef(null) // Tracks the pre-replay verdict to compare against
   
   const [loading, setLoading] = useState(false)
   const [isAutoRunning, setIsAutoRunning] = useState(false)
@@ -100,6 +104,13 @@ function App() {
                                     request: initialEvent.request,
                                     state: initialEvent.state
                                 });
+                                // Save the original decision so replay can compare against it
+                                originalDecisionRef.current = {
+                                    action: data.decision.action,
+                                    finalPrice: data.decision.final_price_per_hour,
+                                    explanation: data.decision.explanation,
+                                    policies: initialEvent.policies || null 
+                                };
                             }
                             
                             // Don't add replay runs to the Live Feed, only real ticks
@@ -170,6 +181,22 @@ function App() {
                     const data = JSON.parse(dataStr);
                     currentStream.push(data);
                     setAgentStreamData([...currentStream]);
+                    // When replay final decision arrives, build the comparison object
+                    if (data.type === 'final_decision' && data.is_replay) {
+                        const initialEvent = currentStream.find(d => d.type === 'initial');
+                        const replayPolicies = initialEvent?.replay_policies || policyOverrides;
+                        setComparisonData({
+                            dealRequest: lastDealContext?.request,
+                            original: originalDecisionRef.current || {},
+                            replay: {
+                                action: data.decision.action,
+                                finalPrice: data.decision.final_price_per_hour,
+                                explanation: data.decision.explanation,
+                                policies: replayPolicies
+                            }
+                        });
+                        setComparisonOpen(true);
+                    }
                 } catch (e) { console.error('Parse error on replay chunk', e); }
             }
         }
@@ -463,6 +490,13 @@ function App() {
               </div>
           ))}
       </div>
+
+      {/* Policy Comparison Modal */}
+      <PolicyComparisonModal 
+          isOpen={comparisonOpen}
+          onClose={() => setComparisonOpen(false)}
+          comparison={comparisonData}
+      />
     </div>
   )
 }
