@@ -2,31 +2,59 @@
 
 An educational, "Glass-Box" Agentic AI dynamic pricing engine for B2B GPU leasing. Designed to maximize revenue and fleet utilization by applying semantic business policies over deterministic baseline quotes.
 
-## 🏗️ Architecture
-1. **The Calculator (`core/calculator.py`)**: Computes theoretical fair-market base price and margins.
-2. **The Governor (`core/agent.py`)**: A LangChain-powered LLM Agent that evaluates real-time fleet health (supply/demand) against hard financial constraints (Margin Floors, Eviction Policies). It outputs a final price and a Transparent Explanation for the customer.
-3. **The Simulator (`simulator/chaos_monkey.py`)**: A stochastic event generator that continuously feeds random market conditions and requests to the Agent to test its policies.
+## 📖 Documentation
+- [Executive Summary & Educational Narrative](./docs/executive_summary.md)
+- [System Architecture](./docs/architecture.md)
+- [Pricing Strategy Details](./pricing_strategy.md)
+- [Design Document](./Design\ Document.md)
 
-## ⚙️ How to Run the Simulator
+## ✨ Latest Features
+- **Full-Stack Application**: A modern React frontend combined with a FastAPI backend to visualize real-time agent decisions.
+- **Group-Namespaced Deployment**: Support for multiple isolated student groups using a single backend deployment via `group_id` routing.
+- **Realistic GPU Simulation**: Enhanced simulation handling varying fleet sizes for different GPU architectures (H100, A100, L40S, etc.).
+- **Glass-Box Explainability**: The LLM agent generates real-time, transparent explanations justifying every financial decision and eviction calculation.
+- **Strict Guardrails**: Refined AI persona locking to ensure the agent acts purely as a pricing negotiator, never breaking character as a customer service agent.
+- **Bill and Ledger Management**: Track accrued revenue, evaluate automated QA/QC metrics, and split or refund specific bill items directly in the UI.
 
-1. **Set up Python Environment**
+## ⚙️ Setup & Run Instructions
+
+### 1. Backend Setup
 ```bash
-cd /Users/satwik/Developer/aznext/gpu_pricing_agent
+cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-2. **Configure API Keys**
-Create a `.env` file in the root directory (or export the variable):
-```bash
+**Configure Environment:**
+Create a `.env` file in the `backend` directory:
+```env
 OPENAI_API_KEY="your-sk-key"
 ```
 
-3. **Run the Chaos Monkey! 🐒**
-Execute the interactive terminal simulator:
+**Run the API Server:**
 ```bash
-PYTHONPATH=. python simulator/chaos_monkey.py
+uvicorn app:app --reload
+```
+*(The backend runs on http://localhost:8000)*
+
+### 2. Frontend Setup
+```bash
+cd frontend
+npm install
 ```
 
-Watch as the agent dynamically approves, overrides margins, or evicts spot instances while explaining exactly *why* it made the financial choice.
+**Configure Environment:**
+Create a `.env` file in the `frontend` directory:
+```env
+VITE_API_URL="http://localhost:8000"
+```
+
+**Run the Dashboard:**
+```bash
+npm run dev
+```
+*(The frontend runs on http://localhost:5173)*
+
+### 3. Usage
+Navigate to the frontend URL. You can use the `?group_id=YOUR_GROUP_NAME` query parameter to launch an isolated simulation namespace for your team or students. Watch as the agent dynamically approves, overrides margins, or evicts spot instances while explaining exactly *why* it made the financial choice!

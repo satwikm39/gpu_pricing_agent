@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 
+// Read the same group ID used by App.jsx so all API calls stay consistent.
+const GROUP_ID = new URLSearchParams(window.location.search).get('group') || 'default';
+
 const PolicyControls = () => {
     const [settings, setSettings] = useState({
         min_margin: '15',
@@ -67,7 +70,7 @@ const PolicyControls = () => {
                 post_roi_discount_floor: `${settings.post_roi_discount_floor}%`
             };
             
-            await fetch('http://localhost:8000/api/settings', {
+            await fetch(`http://localhost:8000/api/settings?group_id=${GROUP_ID}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -84,7 +87,7 @@ const PolicyControls = () => {
     const handleEnvSave = async () => {
         setEnvSaving(true);
         try {
-            await fetch('http://localhost:8000/api/environment', {
+            await fetch(`http://localhost:8000/api/environment?group_id=${GROUP_ID}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(envSettings)
@@ -101,7 +104,7 @@ const PolicyControls = () => {
     const triggerChaosEvent = async (scenario) => {
         setActiveEvent(scenario);
         try {
-            await fetch('http://localhost:8000/api/chaos/event', {
+            await fetch(`http://localhost:8000/api/chaos/event?group_id=${GROUP_ID}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ scenario })

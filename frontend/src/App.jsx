@@ -8,6 +8,15 @@ import FleetROIDistribution from './components/FleetROIDistribution'
 import AgentSidebar from './components/AgentSidebar'
 import PolicyComparisonModal from './components/PolicyComparisonModal'
 
+// Read the group ID from the URL query param: ?group=team1
+// Falls back to "default" if not provided.
+function getGroupId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('group') || 'default';
+}
+
+const GROUP_ID = getGroupId();
+
 function App() {
   const [activeTab, setActiveTab] = useState('simulation') // 'simulation' or 'calculator'
   const [metrics, setMetrics] = useState({
@@ -29,6 +38,7 @@ function App() {
   const [comparisonOpen, setComparisonOpen] = useState(false)
   const originalDecisionRef = useRef(null) // Tracks the pre-replay verdict to compare against
   
+  const [finalDecision, setFinalDecision] = useState(null) // Tracks the current tick's final decision
   const [loading, setLoading] = useState(false)
   const [isAutoRunning, setIsAutoRunning] = useState(false)
 
@@ -36,8 +46,8 @@ function App() {
   useEffect(() => {
       const resetOnLoad = async () => {
           try {
-              await fetch('http://localhost:8000/api/metrics/reset', { method: 'POST' });
-              const response = await fetch('http://localhost:8000/api/metrics');
+              await fetch(`http://localhost:8000/api/metrics/reset?group_id=${GROUP_ID}`, { method: 'POST' });
+              const response = await fetch(`http://localhost:8000/api/metrics?group_id=${GROUP_ID}`);
               const data = await response.json();
               setMetrics(data);
           } catch (err) {
@@ -63,7 +73,7 @@ function App() {
     let currentStream = [];
     
     try {
-        const response = await fetch('http://localhost:8000/api/tick/stream');
+        const response = await fetch(`http://localhost:8000/api/tick/stream?group_id=${GROUP_ID}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -158,7 +168,7 @@ function App() {
     let currentStream = [];
 
     try {
-        const response = await fetch('http://localhost:8000/api/tick/replay', {
+        const response = await fetch(`http://localhost:8000/api/tick/replay?group_id=${GROUP_ID}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -227,7 +237,7 @@ function App() {
   useEffect(() => {
     const fetchInitial = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/metrics')
+            const response = await fetch(`http://localhost:8000/api/metrics?group_id=${GROUP_ID}`)
             const data = await response.json()
             setMetrics(data)
         } catch (err) {
@@ -252,8 +262,8 @@ function App() {
       setChartData([]);
       try {
           // Tell the backend to reset the metrics tracking counters
-          await fetch('http://localhost:8000/api/metrics/reset', { method: 'POST' });
-          const response = await fetch('http://localhost:8000/api/metrics')
+          await fetch(`http://localhost:8000/api/metrics/reset?group_id=${GROUP_ID}`, { method: 'POST' });
+          const response = await fetch(`http://localhost:8000/api/metrics?group_id=${GROUP_ID}`)
           const data = await response.json()
           setMetrics(data)
       } catch (err) {
@@ -268,7 +278,15 @@ function App() {
             <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-primary-500 to-accent-400 tracking-tight font-display drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">
                 GPU Pricing Agent
             </h1>
-            <p className="text-slate-400 mt-1 uppercase tracking-widest text-xs font-semibold">Autonomous Deal Desk Simulation</p>
+            <div className="flex items-center gap-3 mt-1">
+                <p className="text-slate-400 uppercase tracking-widest text-xs font-semibold">Autonomous Deal Desk Simulation</p>
+                {GROUP_ID !== 'default' && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-600/20 text-primary-300 border border-primary-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse"></span>
+                        {GROUP_ID}
+                    </span>
+                )}
+            </div>
         </div>
         
         {activeTab === 'simulation' && (

@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from core.models import LeaseRequest, GPUState
@@ -29,8 +29,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize the global simulator state
-simulator = ChaosMonkeySimulator()
+# ── Group-namespaced simulator registry ──────────────────────────────────────
+# Each group_id maps to its own fully isolated ChaosMonkeySimulator instance.
+# Instances are created lazily on first use.
+simulators: dict[str, ChaosMonkeySimulator] = {}
+
+def get_simulator(group_id: str) -> ChaosMonkeySimulator:
+    """Return the simulator for the given group, creating it if it doesn't exist."""
+    if group_id not in simulators:
+        simulators[group_id] = ChaosMonkeySimulator()
+    return simulators[group_id]
+# ─────────────────────────────────────────────────────────────────────────────
 
 class SettingsUpdate(BaseModel):
     min_margin: str
@@ -49,31 +58,33 @@ class ChaosEvent(BaseModel):
     scenario: str # 'predictable', 'demand_spike', 'market_slump'
 
 @app.get("/api/settings")
-async def get_settings():
+async def get_settings(group_id: str = Query(default="default")):
     """Returns exactly what is set in the simulator currently."""
-    return simulator.policy_thresholds
+    return get_simulator(group_id).policy_thresholds
 
 @app.get("/api/metrics")
-async def get_metrics():
+async def get_metrics(group_id: str = Query(default="default")):
     """Returns the backend metrics tracking."""
+    sim = get_simulator(group_id)
     return {
-        "total_revenue": simulator.total_revenue,
-        "trust_score": simulator.trust_score,
-        "evictions": simulator.evictions,
-        "rejected_deals": simulator.rejected_deals,
-        "hardware_cost": simulator.hardware_cost,
+        "total_revenue": sim.total_revenue,
+        "trust_score": sim.trust_score,
+        "evictions": sim.evictions,
+        "rejected_deals": sim.rejected_deals,
+        "hardware_cost": sim.hardware_cost,
     }
 
 @app.post("/api/metrics/reset")
-async def reset_metrics():
+async def reset_metrics(group_id: str = Query(default="default")):
     """Resets the backend metrics tracking counters."""
-    simulator.reset_metrics()
+    get_simulator(group_id).reset_metrics()
     return {"status": "success", "message": "Metrics reset"}
 
 @app.post("/api/settings")
-async def update_settings(settings: SettingsUpdate):
+async def update_settings(settings: SettingsUpdate, group_id: str = Query(default="default")):
     """Updates the policy thresholds on the agent."""
-    simulator.policy_thresholds = {
+    sim = get_simulator(group_id)
+    sim.policy_thresholds = {
         "min_margin": settings.min_margin,
         "scarcity_threshold": settings.scarcity_threshold,
         "scarcity_multiplier": settings.scarcity_multiplier,
@@ -81,23 +92,25 @@ async def update_settings(settings: SettingsUpdate):
         "eviction_delta": settings.eviction_delta,
         "post_roi_discount_floor": settings.post_roi_discount_floor
     }
-    return {"status": "success", "new_settings": simulator.policy_thresholds}
+    return {"status": "success", "new_settings": sim.policy_thresholds}
 
 @app.post("/api/environment")
-async def update_environment(env: EnvironmentUpdate):
+async def update_environment(env: EnvironmentUpdate, group_id: str = Query(default="default")):
     """Updates the underlying hardware costs in the simulator."""
-    simulator.environment_settings = {
+    sim = get_simulator(group_id)
+    sim.environment_settings = {
         "gpu_type": env.gpu_type,
         "depreciation_cost": env.depreciation_cost,
         "power_opex": env.power_opex
     }
-    return {"status": "success", "new_environment": simulator.environment_settings}
+    return {"status": "success", "new_environment": sim.environment_settings}
 
 @app.post("/api/chaos/event")
-async def trigger_chaos_event(event: ChaosEvent):
+async def trigger_chaos_event(event: ChaosEvent, group_id: str = Query(default="default")):
     """Overrides the Chaos Monkey's current simulation mode."""
-    simulator.current_market_scenario = event.scenario
-    return {"status": "success", "scenario": simulator.current_market_scenario}
+    sim = get_simulator(group_id)
+    sim.current_market_scenario = event.scenario
+    return {"status": "success", "scenario": sim.current_market_scenario}
 
 from sse_starlette.sse import EventSourceResponse
 from typing import Optional, Dict, Any
@@ -108,14 +121,15 @@ class ReplayPayload(BaseModel):
     policy_overrides: Optional[Dict[str, Any]] = None
 
 @app.post("/api/tick/replay")
-async def replay_tick_stream(payload: ReplayPayload):
+async def replay_tick_stream(payload: ReplayPayload, group_id: str = Query(default="default")):
     """
     Replays a specific frozen request+state through the multi-agent graph
     with optional policy overrides. Streams SSE output exactly like /api/tick/stream.
     Does NOT update simulator metrics — this is a pure what-if analysis.
     """
+    sim = get_simulator(group_id)
     async def sse_generator():
-        async for chunk_json in simulator.run_replay_stream(
+        async for chunk_json in sim.run_replay_stream(
             request=payload.request,
             state=payload.state,
             policy_overrides=payload.policy_overrides
@@ -126,11 +140,11 @@ async def replay_tick_stream(payload: ReplayPayload):
 
 
 @app.get("/api/tick/stream")
-async def run_tick_stream():
+async def run_tick_stream(group_id: str = Query(default="default")):
     """Executes one tick of the simulation and streams the multi-agent thought process."""
-    # Wrap the generator to yield standard SSE string formats or dicts expected by EventSourceResponse
+    sim = get_simulator(group_id)
     async def sse_generator():
-        async for chunk_json in simulator.run_tick_stream():
+        async for chunk_json in sim.run_tick_stream():
             yield {"data": chunk_json}
     
     return EventSourceResponse(sse_generator())
