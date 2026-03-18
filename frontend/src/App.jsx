@@ -69,6 +69,7 @@ function App() {
     setFinalDecision(null) // Reset decision
     setComparisonData(null) // Wipe stale comparison
     setComparisonOpen(false) // Ensure modal is closed
+    originalDecisionRef.current = null // Reset gold standard — this tick will become the new one
     
     let currentStream = [];
     

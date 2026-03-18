@@ -143,7 +143,7 @@ OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence scenario analysi
 
 async def policy_critique_agent(state: AgenticState):
     sys_prompt = """You are the **Policy Critique Agent**.
-Look at the Analyst's what-if scenario and the current policies. Critique the current settings and suggest a better policy tweak.
+Look at the Analyst's what-if scenario and the current policies. Critique the current settings and suggest better policy tweaks where warranted.
 
 CRITICAL CONSTRAINT: You may ONLY suggest tweaks for the following 6 keys:
 1. min_margin (e.g. 10%)
@@ -158,8 +158,10 @@ Do NOT suggest hardware expansion or "dynamic inventory" here; that is for the I
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a concise but detailed 2-3 sentence policy critique. 
-At the end, provide a specific policy suggestion in the format: [SUGGESTION: key=value]
+OUTPUT INSTRUCTION: Provide a concise 2-3 sentence policy critique.
+Then, provide ONLY the policy suggestions that are genuinely warranted by the current situation — anywhere from 1 to all 6.
+Do NOT force suggestions for policies that are already well-calibrated.
+Format each suggestion on its own line as: [SUGGESTION: key=value]
 (e.g., [SUGGESTION: min_margin=10%] or [SUGGESTION: scarcity_multiplier=1.5x])"""
     return await generate_thought("Policy Critique", sys_prompt, state)
 
