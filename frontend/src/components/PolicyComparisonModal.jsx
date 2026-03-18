@@ -142,7 +142,7 @@ const PolicyComparisonModal = ({ isOpen, onClose, comparison }) => {
                             {Object.entries(POLICY_LABELS).map(([key, meta]) => {
                                 const val = original.policies?.[key];
                                 const replayVal = replay.policies?.[key];
-                                const changed = val !== replayVal;
+                                const changed = normalizePolicy(val) !== normalizePolicy(replayVal);
                                 return (
                                     <div key={key} className={`p-3 rounded-xl border transition-all ${changed ? 'bg-blue-900/10 border-blue-500/20' : 'bg-white/[0.02] border-white/5'}`}>
                                         <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">{meta.label}</p>
