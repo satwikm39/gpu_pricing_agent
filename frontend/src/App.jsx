@@ -224,6 +224,80 @@ function App() {
     }
   }, [lastDealContext, loading, isThinking]);
 
+  const handleExecuteCounterOffer = useCallback(async (newPrice) => {
+    if (!lastDealContext || loading || isThinking) return;
+
+    setLoading(true);
+    setIsThinking(true);
+    setAgentStreamData([]);
+    let currentStream = [];
+
+    const modifiedRequest = { ...lastDealContext.request, bid_price_per_hour: parseFloat(newPrice) };
+
+    try {
+        const response = await fetch(`http://localhost:8000/api/tick/execute?group_id=${GROUP_ID}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                request: modifiedRequest,
+                state: lastDealContext.state
+            })
+        });
+
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            for (const line of chunk.split('\n')) {
+                if (!line.startsWith('data: ')) continue;
+                const dataStr = line.replace('data: ', '').trim();
+                if (!dataStr) continue;
+                try {
+                    const data = JSON.parse(dataStr);
+                    currentStream.push(data);
+                    setAgentStreamData([...currentStream]);
+                    
+                    if (data.type === 'final_decision') {
+                        setMetrics(data.metrics);
+                        
+                        const mockTick = {
+                            request: currentStream.find(d => d.type === 'initial')?.request || {},
+                            state: currentStream.find(d => d.type === 'initial')?.state || {},
+                            decision: data.decision,
+                            metrics: data.metrics
+                        };
+                        
+                        setFeed(prev => [mockTick, ...prev]);
+                        
+                        setChartData(prev => {
+                            const st = mockTick.state;
+                            const utilization = st && st.total_inventory > 0 
+                                ? ((st.total_inventory - st.available_inventory) / st.total_inventory) * 100 
+                                : 0;
+                            const newPoint = {
+                                tick: prev.length + 1,
+                                revenue: data.metrics.total_revenue,
+                                utilization: parseFloat(utilization.toFixed(2))
+                            };
+                            return [...prev, newPoint].slice(-50);
+                        });
+                    }
+                } catch (e) { console.error('Parse error on execute chunk', e); }
+            }
+        }
+    } catch (err) {
+        console.error('Execute failed', err);
+    } finally {
+        setLoading(false);
+        setIsThinking(false);
+    }
+  }, [lastDealContext, loading, isThinking]);
+
   // Handle auto-run interval
   useEffect(() => {
     let interval;
@@ -493,6 +567,7 @@ function App() {
                         isThinking={isThinking}
                         lastDealContext={lastDealContext}
                         onReplay={handleReplay}
+                        onExecuteCounterOffer={handleExecuteCounterOffer}
                         onViewComparison={() => setComparisonOpen(true)}
                         hasComparison={!!comparisonData}
                     />

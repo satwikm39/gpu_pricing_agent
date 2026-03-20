@@ -7,19 +7,27 @@ const LiveFeed = ({ data }) => {
     const isOverride = decision.action === 'OVERRIDE';
     const isEvict = decision.action === 'EVICT';
 
+    const isReject = decision.action === 'REJECT';
+
     const getBorderColor = () => {
-        if (isEvict) return 'border-red-500/50';
+        if (isEvict || isReject) return 'border-red-500/50';
         if (isOverride) return 'border-yellow-500/50';
         if (isApprove) return 'border-green-500/50';
         return 'border-slate-500/50';
     };
 
     const getBadgeColor = () => {
-        if (isEvict) return 'bg-red-500/20 text-red-400 border-red-500/30';
+        if (isEvict || isReject) return 'bg-red-500/20 text-red-400 border-red-500/30';
         if (isOverride) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
         if (isApprove) return 'bg-green-500/20 text-green-400 border-green-500/30';
         return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
     };
+
+    const priceLabel = isReject && request.workload_type === 'Spot' ? 'Rejected Bid Price' : 
+                       isReject ? 'Baseline Price (Rejected)' : 'Final Executed Price';
+    const displayPrice = isReject && request.workload_type === 'Spot' && request.bid_price_per_hour
+                       ? request.bid_price_per_hour
+                       : decision.final_price_per_hour;
 
     const formatMoney = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
@@ -77,14 +85,14 @@ const LiveFeed = ({ data }) => {
                 </div>
             </div>
             <div className={`flex justify-between items-center py-3 mt-2 mb-2 bg-slate-900/60 rounded-xl px-5 border border-dashed hover:border-solid transition-all ${getBorderColor()} shadow-inner`}>
-                <span className={`font-display font-bold uppercase tracking-[0.1em] text-xs flex items-center gap-2 ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
+                <span className={`font-display font-bold uppercase tracking-[0.1em] text-xs flex items-center gap-2 ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : isEvict || isReject ? 'text-red-400' : 'text-slate-400'}`}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                     </svg>
-                    Final Executed Price
+                    {priceLabel}
                 </span>
-                <span className={`font-mono font-bold text-xl drop-shadow-md ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : 'text-red-400'}`}>
-                    ${decision.final_price_per_hour.toFixed(2)} <span className="text-sm text-slate-500 opacity-80">/hr</span>
+                <span className={`font-mono font-bold text-xl drop-shadow-md ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : isEvict || isReject ? 'text-red-400' : 'text-slate-400'}`}>
+                    ${displayPrice.toFixed(2)} <span className={`text-sm opacity-80 ${isApprove ? 'text-green-500' : isOverride ? 'text-yellow-500' : isEvict || isReject ? 'text-red-500' : 'text-slate-500'}`}>/hr</span>
                 </span>
             </div>
 

@@ -132,6 +132,36 @@ Context:
     
     return {"thoughts": [thought], "final_decision": decision.model_dump()}
 
+async def bidding_agent(state: AgenticState):
+    request = state["request"]
+    current_bid = request.bid_price_per_hour if request.bid_price_per_hour else state["gpu_state"].market_price_per_hour
+    
+    sys_prompt = """You are the **Bidding Agent**. 
+The Supreme Judge has REJECTED the previous offer. 
+Analyze the situation and provide a counter-offer. 
+Offer a price that is ~10-20% higher than the previous bid but still attractive.
+
+Context:
+{context}
+
+OUTPUT INSTRUCTION: Output your thought process in 2 sentences. The last sentence MUST be the new counter-offer price in the exact format: [COUNTER_OFFER: X.XX]"""
+    
+    result = await generate_thought("Bidding Agent", sys_prompt, state)
+    
+    # Parse the counter offer from the thought
+    thought_content = result["thoughts"][0].content
+    new_price = current_bid * 1.15 # fallback
+    import re
+    match = re.search(r'\[COUNTER_OFFER:\s*\$?([\d.]+)\]', thought_content)
+    if match:
+        new_price = float(match.group(1))
+    
+    request.bid_price_per_hour = round(new_price, 2)
+    return {
+        "thoughts": result["thoughts"],
+        "request": request
+    }
+
 async def policy_analyst_agent(state: AgenticState):
     sys_prompt = """You are the **Policy Analyst Agent**.
 Given the Supreme Judge's final decision, perform a quick what-if scenario analysis. What if our policies were slightly more aggressive or conservative?
@@ -176,12 +206,22 @@ def build_graph():
     builder.add_node("market", market_monitor_agent)
     builder.add_node("inventory", inventory_agent)
     builder.add_node("judge", judge_agent)
+    builder.add_node("bidding", bidding_agent)
     builder.add_node("analyst", policy_analyst_agent)
     builder.add_node("critique", policy_critique_agent)
     
+    # Routing function after critique
+    def route_after_critique(state: AgenticState) -> str:
+        decision = state.get("final_decision", {})
+        action = decision.get("action", "") if decision else ""
+        
+        # If REJECTED, go to bidding agent to generate counter-offer
+        if action == "REJECT":
+            return "bidding"
+        
+        return END
+
     # Flow logic:
-    # START -> Pricing -> Negative -> Positive -> Market -> Inventory -> Judge -> Analyst -> Critique -> END
-    
     builder.add_edge(START, "pricing")
     builder.add_edge("pricing", "negative")
     builder.add_edge("negative", "positive")
@@ -190,7 +230,14 @@ def build_graph():
     builder.add_edge("inventory", "judge")
     builder.add_edge("judge", "analyst")
     builder.add_edge("analyst", "critique")
-    builder.add_edge("critique", END)
+    
+    # Conditional edge from critique
+    builder.add_conditional_edges("critique", route_after_critique, {
+        "bidding": "bidding",
+        END: END
+    })
+    
+    builder.add_edge("bidding", END)
     
     return builder.compile()
 

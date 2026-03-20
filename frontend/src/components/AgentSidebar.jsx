@@ -6,7 +6,8 @@ const AGENT_SEQUENCE = [
     { node: 'positive', name: 'Opportunistic Growth Agent', icon: '🚀' },
     { node: 'market', name: 'Market Monitor Agent', icon: '📈' },
     { node: 'inventory', name: 'Capacity Agent', icon: '📦' },
-    { node: 'judge', name: 'Supreme Judge', icon: '⚖️' }
+    { node: 'judge', name: 'Supreme Judge', icon: '⚖️' },
+    { node: 'bidding', name: 'Bidding Agent', icon: '🤝' }
 ];
 
 const POLICY_SEQUENCE = [
@@ -39,6 +40,9 @@ const ThoughtCard = ({ item }) => {
     if (isJudge) {
         styleClass = 'bg-accent-900/20 border-accent-500/50 shadow-[0_0_15px_rgba(139,92,246,0.15)]';
         textClass = 'text-accent-400';
+    } else if (item.node === 'bidding') {
+        styleClass = 'bg-yellow-900/20 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.15)]';
+        textClass = 'text-yellow-400';
     } else if (isPolicy) {
         styleClass = 'bg-slate-800/40 border-slate-600 border-dashed';
         textClass = 'text-slate-400';
@@ -108,7 +112,7 @@ const ThoughtCard = ({ item }) => {
     );
 };
 
-const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onViewComparison, hasComparison }) => {
+const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onExecuteCounterOffer, onViewComparison, hasComparison }) => {
     const endRef = useRef(null);
     const [replayOpen, setReplayOpen] = useState(false);
     const [replayPolicies, setReplayPolicies] = useState({
@@ -125,15 +129,34 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onVie
     const policyThoughts = thoughts.filter(t => ['analyst', 'critique'].includes(t.node));
 
     const initialContext = streamData.find(d => d.type === 'initial');
-    const finalDecision = streamData.find(d => d.type === 'final_decision');
+    const finalDecision = [...streamData].reverse().find(d => d.type === 'final_decision');
+    const hasBidding = thoughts.some(t => t.node === 'bidding');
+    const biddingThought = thoughts.find(t => t.node === 'bidding');
     
     let expectedNextAgent = null;
     let expectedNextPolicyAgent = null;
 
-    if (dealThoughts.length < AGENT_SEQUENCE.length) {
-        expectedNextAgent = AGENT_SEQUENCE[dealThoughts.length];
-    } else if (policyThoughts.length < POLICY_SEQUENCE.length) {
-        expectedNextPolicyAgent = POLICY_SEQUENCE[policyThoughts.length];
+    if (isThinking) {
+        if (dealThoughts.length === 0) {
+            expectedNextAgent = AGENT_SEQUENCE[0];
+        } else if (policyThoughts.length === 0 && !finalDecision) {
+            // Find next based on last thought
+            const lastNode = dealThoughts[dealThoughts.length - 1].node;
+            const lastIdx = AGENT_SEQUENCE.findIndex(a => a.node === lastNode);
+            
+            if (lastNode === 'bidding') {
+                expectedNextAgent = AGENT_SEQUENCE[0]; // Loops back to pricing
+            } else if (lastNode === 'judge') {
+                // We don't know yet if it goes to bidding or analyst
+                expectedNextAgent = { name: 'Graph Router', icon: '🔄' };
+            } else if (lastIdx !== -1 && lastIdx < AGENT_SEQUENCE.length - 1) {
+                expectedNextAgent = AGENT_SEQUENCE[lastIdx + 1];
+            }
+        }
+        
+        if (finalDecision && policyThoughts.length < POLICY_SEQUENCE.length) {
+            expectedNextPolicyAgent = POLICY_SEQUENCE[policyThoughts.length];
+        }
     }
 
     return (
@@ -183,6 +206,10 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onVie
                                 </h3>
                                 <div className="text-slate-300 text-sm font-mono flex flex-col gap-1.5 bg-black/20 p-3 rounded-lg border border-white/5">
                                     <p className="flex justify-between"><span className="text-slate-500">Request:</span> <span>{initialContext.request.quantity}x {initialContext.request.gpu_type} ({initialContext.request.duration_hours}h)</span></p>
+                                    <p className="flex justify-between"><span className="text-slate-500">Type:</span> <span>{initialContext.request.workload_type}</span></p>
+                                    {initialContext.request.workload_type === 'Spot' && initialContext.request.bid_price_per_hour && (
+                                        <p className="flex justify-between"><span className="text-slate-500">Bid Price:</span> <span className="text-yellow-400 font-bold">${initialContext.request.bid_price_per_hour.toFixed(2)}/hr</span></p>
+                                    )}
                                     <p className="flex justify-between"><span className="text-slate-500">Avail:</span> <span>{initialContext.state.available_inventory} / {initialContext.state.total_inventory}</span></p>
                                     <p className="flex justify-between"><span className="text-slate-500">Comp ({initialContext.state.market_competitor_name}):</span> <span>${initialContext.state.market_price_per_hour.toFixed(2)}/hr</span></p>
                                 </div>
@@ -209,7 +236,7 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onVie
                             </div>
                         )}
 
-                        {finalDecision && (
+                        {finalDecision && !hasBidding && (
                             <div className="bg-emerald-900/10 border border-emerald-500/30 rounded-xl p-5 shadow-[0_0_20px_rgba(16,185,129,0.1)] mt-2 animate-fade-in ml-8 relative glow-top">
                                 <div className="absolute -left-[45px] top-6 border-[3px] border-emerald-500 bg-slate-900 w-4 h-4 rounded-full z-10 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
                                 <h3 className="text-emerald-400 font-display font-bold text-sm tracking-[0.1em] mb-4 flex items-center gap-2 uppercase">
@@ -225,7 +252,46 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onVie
                                             {finalDecision.decision.action}
                                         </span>
                                     </p>
-                                    <p className="mb-1"><span className="text-slate-400">Final Price:</span> <span className="text-white font-bold ml-2">${finalDecision.decision.final_price_per_hour.toFixed(2)}/hr</span></p>
+                                    <p className="mb-1">
+                                        <span className="text-slate-400">
+                                            {finalDecision.decision.action === 'REJECT' && initialContext?.request?.workload_type === 'Spot' ? 'Rejected Bid Price:' : 
+                                             finalDecision.decision.action === 'REJECT' ? 'Baseline Price (Rejected):' : 'Final Price:'}
+                                        </span> 
+                                        <span className="text-white font-bold ml-2">
+                                            ${(finalDecision.decision.action === 'REJECT' && initialContext?.request?.workload_type === 'Spot' && initialContext?.request?.bid_price_per_hour 
+                                                ? initialContext.request.bid_price_per_hour 
+                                                : finalDecision.decision.final_price_per_hour).toFixed(2)}/hr
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {finalDecision && hasBidding && biddingThought && !isThinking && (
+                            <div className="bg-yellow-900/10 border border-yellow-500/30 rounded-xl p-5 shadow-[0_0_20px_rgba(234,179,8,0.1)] mt-2 animate-fade-in ml-8 relative glow-top">
+                                <div className="absolute -left-[45px] top-6 border-[3px] border-yellow-500 bg-slate-900 w-4 h-4 rounded-full z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
+                                <h3 className="text-yellow-400 font-display font-bold text-sm tracking-[0.1em] mb-4 flex items-center gap-2 uppercase">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Counter-Offer Pending
+                                </h3>
+                                <div className="text-sm text-slate-300 mb-4">
+                                    The Bidding Agent has proposed a counter-offer for this rejected deal. Do you want to accept the new price and re-run?
+                                </div>
+                                <div className="flex gap-3 mt-2">
+                                    <button 
+                                        onClick={() => {
+                                            const match = biddingThought.thought.content.match(/\[COUNTER_OFFER:\s*\$?([\d.]+)\]/);
+                                            const newPrice = match ? parseFloat(match[1]) : null;
+                                            if (onExecuteCounterOffer && newPrice) {
+                                                onExecuteCounterOffer(newPrice);
+                                            }
+                                        }}
+                                        className="flex-1 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-white font-bold text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(234,179,8,0.3)]"
+                                    >
+                                        Approve &amp; Re-Run
+                                    </button>
                                 </div>
                             </div>
                         )}

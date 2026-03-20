@@ -139,6 +139,22 @@ async def replay_tick_stream(payload: ReplayPayload, group_id: str = Query(defau
     return EventSourceResponse(sse_generator())
 
 
+@app.post("/api/tick/execute")
+async def execute_tick_stream(payload: ReplayPayload, group_id: str = Query(default="default")):
+    """
+    Executes a specific request+state through the multi-agent graph,
+    updating the simulator metrics.
+    """
+    sim = get_simulator(group_id)
+    async def sse_generator():
+        async for chunk_json in sim.run_tick_stream(
+            request=payload.request,
+            state=payload.state
+        ):
+            yield {"data": chunk_json}
+
+    return EventSourceResponse(sse_generator())
+
 @app.get("/api/tick/stream")
 async def run_tick_stream(group_id: str = Query(default="default")):
     """Executes one tick of the simulation and streams the multi-agent thought process."""

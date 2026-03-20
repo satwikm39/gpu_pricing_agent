@@ -117,13 +117,15 @@ class ChaosMonkeySimulator:
             bid_price_per_hour=bid if wt == "Spot" else None
         )
 
-    async def run_tick_stream(self):
+    async def run_tick_stream(self, request: LeaseRequest = None, state: GPUState = None):
         """
         An async generator that streams the execution of the multi-agent graph.
         Yields JSON strings ready for SSE.
         """
-        state = self.generate_random_state()
-        request = self.generate_stochastic_request(state)
+        if state is None:
+            state = self.generate_random_state()
+        if request is None:
+            request = self.generate_stochastic_request(state)
         
         # Send an initial event to the UI so it can display the request context immediately
         initial_data = {
