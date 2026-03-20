@@ -211,7 +211,14 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onExe
                                         <p className="flex justify-between"><span className="text-slate-500">Bid Price:</span> <span className="text-yellow-400 font-bold">${initialContext.request.bid_price_per_hour.toFixed(2)}/hr</span></p>
                                     )}
                                     <p className="flex justify-between"><span className="text-slate-500">Avail:</span> <span>{initialContext.state.available_inventory} / {initialContext.state.total_inventory}</span></p>
-                                    <p className="flex justify-between"><span className="text-slate-500">Comp ({initialContext.state.market_competitor_name}):</span> <span>${initialContext.state.market_price_per_hour.toFixed(2)}/hr</span></p>
+                                    
+                                    <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between">
+                                        <span className="text-pink-400/80 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_5px_rgba(236,72,153,0.8)] animate-pulse"></div>
+                                            {initialContext.state.market_competitor_name} (Mkt)
+                                        </span>
+                                        <span className="text-pink-400 font-bold">${initialContext.state.market_price_per_hour.toFixed(2)}/hr</span>
+                                    </div>
                                 </div>
                             </div>
                         )}
