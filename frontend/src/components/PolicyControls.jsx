@@ -70,7 +70,7 @@ const PolicyControls = () => {
                 post_roi_discount_floor: `${settings.post_roi_discount_floor}%`
             };
             
-            await fetch(`http://localhost:8000/api/settings?group_id=${GROUP_ID}`, {
+            await fetch(`/api/settings?group_id=${GROUP_ID}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -87,7 +87,7 @@ const PolicyControls = () => {
     const handleEnvSave = async () => {
         setEnvSaving(true);
         try {
-            await fetch(`http://localhost:8000/api/environment?group_id=${GROUP_ID}`, {
+            await fetch(`/api/environment?group_id=${GROUP_ID}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(envSettings)
@@ -104,7 +104,7 @@ const PolicyControls = () => {
     const triggerChaosEvent = async (scenario) => {
         setActiveEvent(scenario);
         try {
-            await fetch(`http://localhost:8000/api/chaos/event?group_id=${GROUP_ID}`, {
+            await fetch(`/api/chaos/event?group_id=${GROUP_ID}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ scenario })

@@ -46,8 +46,8 @@ function App() {
   useEffect(() => {
       const resetOnLoad = async () => {
           try {
-              await fetch(`http://localhost:8000/api/metrics/reset?group_id=${GROUP_ID}`, { method: 'POST' });
-              const response = await fetch(`http://localhost:8000/api/metrics?group_id=${GROUP_ID}`);
+              await fetch(`/api/metrics/reset?group_id=${GROUP_ID}`, { method: 'POST' });
+              const response = await fetch(`/api/metrics?group_id=${GROUP_ID}`);
               const data = await response.json();
               setMetrics(data);
           } catch (err) {
@@ -74,7 +74,7 @@ function App() {
     let currentStream = [];
     
     try {
-        const response = await fetch(`http://localhost:8000/api/tick/stream?group_id=${GROUP_ID}`);
+        const response = await fetch(`/api/tick/stream?group_id=${GROUP_ID}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -169,7 +169,7 @@ function App() {
     let currentStream = [];
 
     try {
-        const response = await fetch(`http://localhost:8000/api/tick/replay?group_id=${GROUP_ID}`, {
+        const response = await fetch(`/api/tick/replay?group_id=${GROUP_ID}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -235,7 +235,7 @@ function App() {
     const modifiedRequest = { ...lastDealContext.request, bid_price_per_hour: parseFloat(newPrice) };
 
     try {
-        const response = await fetch(`http://localhost:8000/api/tick/execute?group_id=${GROUP_ID}`, {
+        const response = await fetch(`/api/tick/execute?group_id=${GROUP_ID}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -312,7 +312,7 @@ function App() {
   useEffect(() => {
     const fetchInitial = async () => {
         try {
-            const response = await fetch(`http://localhost:8000/api/metrics?group_id=${GROUP_ID}`)
+            const response = await fetch(`/api/metrics?group_id=${GROUP_ID}`)
             const data = await response.json()
             setMetrics(data)
         } catch (err) {
@@ -337,8 +337,8 @@ function App() {
       setChartData([]);
       try {
           // Tell the backend to reset the metrics tracking counters
-          await fetch(`http://localhost:8000/api/metrics/reset?group_id=${GROUP_ID}`, { method: 'POST' });
-          const response = await fetch(`http://localhost:8000/api/metrics?group_id=${GROUP_ID}`)
+          await fetch(`/api/metrics/reset?group_id=${GROUP_ID}`, { method: 'POST' });
+          const response = await fetch(`/api/metrics?group_id=${GROUP_ID}`)
           const data = await response.json()
           setMetrics(data)
       } catch (err) {
