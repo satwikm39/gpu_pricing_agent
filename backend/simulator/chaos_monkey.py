@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from core.models import LeaseRequest, GPUState, AgentDecision
 from core.multi_agent import multi_agent_app, AgenticState
+from simulator.scenarios import SCENARIOS
 
 from rich.console import Console
 
@@ -16,7 +17,14 @@ load_dotenv()
 console = Console()
 
 class ChaosMonkeySimulator:
-    def __init__(self):
+    def __init__(self, group_id: str = "default"):
+        self.group_id = group_id
+
+        # ── Deterministic scenario support ────────────────────────────────
+        self.simulation_mode = os.environ.get("SIMULATION_MODE", "deterministic")
+        self.tick_counter = 0
+        self.next_scenario_idx = random.randint(0, len(SCENARIOS) - 1)
+
         # Internal State tracking
         self.total_revenue = 0.0
         self.evictions = 0
@@ -117,15 +125,52 @@ class ChaosMonkeySimulator:
             bid_price_per_hour=bid if wt == "Spot" else None
         )
 
+    def get_current_scenario_info(self) -> dict:
+        """Return info about the next scenario that will be served (developer debug)."""
+        if self.simulation_mode != "deterministic":
+            return {
+                "mode": "random",
+                "message": "Running in random mode — no predetermined scenario.",
+            }
+        idx = self.next_scenario_idx
+        scenario = SCENARIOS[idx]
+        return {
+            "mode": "deterministic",
+            "tick_counter": self.tick_counter,
+            "scenario_index": idx,
+            "scenario_name": scenario["name"],
+            "scenario_description": scenario["description"],
+            "expected_behavior": scenario["expected_behavior"],
+        }
+
     async def run_tick_stream(self, request: LeaseRequest = None, state: GPUState = None):
         """
         An async generator that streams the execution of the multi-agent graph.
         Yields JSON strings ready for SSE.
         """
-        if state is None:
-            state = self.generate_random_state()
-        if request is None:
-            request = self.generate_stochastic_request(state)
+        # ── Deterministic mode: pull from pre-built scenarios ─────────
+        if self.simulation_mode == "deterministic" and request is None and state is None:
+            idx = self.next_scenario_idx
+            scenario = SCENARIOS[idx]
+            state = scenario["gpu_state"]
+            request = scenario["request"]
+            console.print(
+                f"\n[bold cyan]{'─' * 60}[/bold cyan]"
+                f"\n[bold yellow]📋 SCENARIO EXECUTED[/bold yellow]"
+                f"\n[dim]Group:[/dim]    [bold]{self.group_id}[/bold]"
+                f"\n[dim]Tick:[/dim]     [bold]{self.tick_counter + 1}/14[/bold]"
+                f"\n[dim]Scenario:[/dim] [bold green]#{idx + 1} — {scenario['name']}[/bold green]"
+                f"\n[dim]Expected:[/dim] [italic]{scenario['expected_behavior']}[/italic]"
+                f"\n[bold cyan]{'─' * 60}[/bold cyan]\n"
+            )
+            self.tick_counter += 1
+            self.next_scenario_idx = random.randint(0, len(SCENARIOS) - 1)
+        else:
+            # Fallback to random generation (original behaviour)
+            if state is None:
+                state = self.generate_random_state()
+            if request is None:
+                request = self.generate_stochastic_request(state)
         
         # Send an initial event to the UI so it can display the request context immediately
         initial_data = {
@@ -251,6 +296,7 @@ class ChaosMonkeySimulator:
         self.trust_score = 100
         self.rejected_deals = 0
         self.hardware_cost = 250000.0
+        self.tick_counter = 0
 
 if __name__ == "__main__":
     console.print("[bold green]Starting Simulator...[/bold green]")

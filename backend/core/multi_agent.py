@@ -67,7 +67,11 @@ OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence risk analysis. U
 
 async def positive_agent(state: AgenticState):
     sys_prompt = """You are the **Opportunistic Growth Agent**.
-Find reasons to say YES, discount aggressively (if `cost_recovered`), or surge price during scarcity.
+Find reasons to say YES, discount aggressively, or surge price during scarcity.
+
+CRITICAL RULE: You may ONLY suggest post-ROI discounts if `GPU_State.cost_recovered` is explicitly `true`.
+If `cost_recovered` is `false`, do NOT reference or recommend any post-ROI discount strategy.
+
 Context:
 {context}
 
@@ -103,12 +107,36 @@ async def judge_agent(state: AgenticState):
     sys_prompt = """You are the **Supreme Judge Agent**.
 You have reviewed the thoughts from the Pricing, Conservative, Opportunistic, Market, and Capacity agents.
 Your job is to make the FINAL decision.
+
+## ACTION MAPPING (follow strictly):
+- **APPROVE**: The deal is accepted at the calculated baseline price (cost + margin). Use when no policy adjustments are needed.
+- **OVERRIDE**: The deal is accepted but at a DIFFERENT price than baseline, due to market conditions, scarcity, or competitive pressure.
+- **REJECT**: The deal is fundamentally unacceptable (e.g., bid far below cost floor, unrecoverable margin loss).
+- **EVICT**: Inventory is at 0, but the deal is worth fulfilling — an existing spot lease MUST be terminated to free capacity. 
+  **CRITICAL RULE: If `available_inventory` is 0 and you want to accept an On-Demand request, you MUST use EVICT, not APPROVE or OVERRIDE.** Set `target_eviction_id` to "SPOT-LOWEST" to indicate the lowest-value spot lease should be reclaimed.
+
+## POLICY CITATION (mandatory):
+In your `explanation`, you MUST explicitly name the primary Policy that drove your decision:
+- Policy A: `min_margin` (Margin Floor Protection)
+- Policy B: `scarcity_threshold` / `scarcity_multiplier` (Scarcity-Driven Yield)
+- Policy C: `eviction_delta` (Strategic Preemption)
+- Policy D: `post_roi_discount_floor` (Lifecycle Aggression) — ONLY if `cost_recovered` is true
+- Policy E: `max_market_premium` (Market Pulse / Competitive Ceiling)
+
+Format: "Primary Policy: [Policy X — name]. Secondary: [Policy Y — name]."
+
+## PROS/CONS FORMAT (mandatory):
+In the `pros_cons` field, use this exact structure:
+**PROS:**
+- bullet 1
+- bullet 2
+
+**CONS:**
+- bullet 1
+- bullet 2
+
 You MUST output a JSON object matching the `AgentDecision` schema exactly.
-Summarize the conflicting arguments in the `pros_cons` field.
-Set `action` to APPROVE, REJECT, OVERRIDE, or EVICT.
-Set `final_price_per_hour`.
-Explain your decision in `explanation`.
-Set `target_eviction_id` if EVICT.
+Set `action`, `final_price_per_hour`, `explanation`, `pros_cons`, and `target_eviction_id` (if EVICT).
 
 Context:
 {context}
@@ -127,7 +155,11 @@ Context:
     # We also add the judge's summary as a thought so it streams to the UI nicely.
     thought = AgentThought(
         agent_name="Supreme Judge",
-        content=f"Decision reached: {decision.action} at ${decision.final_price_per_hour}/hr.\n\nPros/Cons:\n{decision.pros_cons}\n\nExplanation:\n{decision.explanation}"
+        content=(
+            f"Decision reached: {decision.action} at ${decision.final_price_per_hour}/hr.\n\n"
+            f"{decision.pros_cons}\n\n"
+            f"**EXPLANATION:**\n{decision.explanation}"
+        )
     )
     
     return {"thoughts": [thought], "final_decision": decision.model_dump()}

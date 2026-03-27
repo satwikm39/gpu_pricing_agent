@@ -37,7 +37,7 @@ simulators: dict[str, ChaosMonkeySimulator] = {}
 def get_simulator(group_id: str) -> ChaosMonkeySimulator:
     """Return the simulator for the given group, creating it if it doesn't exist."""
     if group_id not in simulators:
-        simulators[group_id] = ChaosMonkeySimulator()
+        simulators[group_id] = ChaosMonkeySimulator(group_id=group_id)
     return simulators[group_id]
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -164,6 +164,11 @@ async def run_tick_stream(group_id: str = Query(default="default")):
             yield {"data": chunk_json}
     
     return EventSourceResponse(sse_generator())
+
+@app.get("/api/debug/scenario")
+async def get_scenario_info(group_id: str = Query(default="default")):
+    """Developer-only: returns the next scenario that will be served for this group."""
+    return get_simulator(group_id).get_current_scenario_info()
 
 # Legacy calculate endpoint removed since multi-agent handles raw data directly.
 @app.post("/api/calculate")
