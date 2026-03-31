@@ -3,6 +3,7 @@ import random
 import uuid
 import os
 import json
+import asyncio
 from dotenv import load_dotenv
 
 from core.models import LeaseRequest, GPUState, AgentDecision
@@ -31,6 +32,10 @@ class ChaosMonkeySimulator:
         self.trust_score = 100
         self.rejected_deals = 0
         self.hardware_cost = 250000.00 # Simulated cost of a small GPU fleet
+
+        # Shared tick history -- all completed ticks visible to every client in the group
+        self.tick_history: list[dict] = []
+        self._history_counter = 0
         
         # Student configuration (The Sandbox)
         self.policy_thresholds = {
@@ -49,6 +54,9 @@ class ChaosMonkeySimulator:
         }
         
         self.current_market_scenario = "predictable" # 'predictable', 'demand_spike', 'market_slump'
+        
+        # Broadcasting system for "Push" model updates
+        self.listeners: list[asyncio.Queue] = []
 
     def generate_random_state(self) -> GPUState:
         gpu = self.environment_settings["gpu_type"]
@@ -143,6 +151,44 @@ class ChaosMonkeySimulator:
             "expected_behavior": scenario["expected_behavior"],
         }
 
+    async def _record_tick(self, request_data: dict, state_data: dict, decision_data: dict, metrics_snapshot: dict):
+        """Append a completed tick to the shared group history and broadcast to all listeners."""
+        self._history_counter += 1
+        tick_data = {
+            "id": self._history_counter,
+            "request": request_data,
+            "state": state_data,
+            "decision": decision_data,
+            "metrics": metrics_snapshot,
+        }
+        self.tick_history.append(tick_data)
+        
+        # Push update to all persistent SSE listeners
+        await self.broadcast({
+            "type": "tick_completed",
+            "tick": tick_data
+        })
+
+    async def broadcast(self, data: dict):
+        """Send a message to all active listeners."""
+        if not self.listeners:
+            return
+        
+        msg = json.dumps(data)
+        # We use a list copy to avoid issues if listeners disconnect during iteration
+        for q in list(self.listeners):
+            await q.put(msg)
+
+    async def subscribe(self):
+        """A generator that yields messages from a new private queue for this listener."""
+        q = asyncio.Queue()
+        self.listeners.append(q)
+        try:
+            while True:
+                yield await q.get()
+        finally:
+            self.listeners.remove(q)
+
     async def run_tick_stream(self, request: LeaseRequest = None, state: GPUState = None):
         """
         An async generator that streams the execution of the multi-agent graph.
@@ -157,7 +203,7 @@ class ChaosMonkeySimulator:
             console.print(
                 f"\n[bold cyan]{'─' * 60}[/bold cyan]"
                 f"\n[bold yellow]📋 SCENARIO EXECUTED[/bold yellow]"
-                f"\n[dim]Group:[/dim]    [bold]{self.group_id}[/bold]"
+                f"\n[dim]Group:[/dim]    [bold magenta]{self.group_id}[/bold magenta]"
                 f"\n[dim]Tick:[/dim]     [bold]{self.tick_counter + 1}/14[/bold]"
                 f"\n[dim]Scenario:[/dim] [bold green]#{idx + 1} — {scenario['name']}[/bold green]"
                 f"\n[dim]Expected:[/dim] [italic]{scenario['expected_behavior']}[/italic]"
@@ -166,11 +212,17 @@ class ChaosMonkeySimulator:
             self.tick_counter += 1
             self.next_scenario_idx = random.randint(0, len(SCENARIOS) - 1)
         else:
-            # Fallback to random generation (original behaviour)
             if state is None:
                 state = self.generate_random_state()
             if request is None:
                 request = self.generate_stochastic_request(state)
+            console.print(
+                f"\n[bold cyan]{'─' * 60}[/bold cyan]"
+                f"\n[bold yellow]📋 TICK EXECUTED[/bold yellow]"
+                f"\n[dim]Group:[/dim]    [bold magenta]{self.group_id}[/bold magenta]"
+                f"\n[dim]Mode:[/dim]     [bold]{'custom request' if request else 'random'}[/bold]"
+                f"\n[bold cyan]{'─' * 60}[/bold cyan]\n"
+            )
         
         # Send an initial event to the UI so it can display the request context immediately
         initial_data = {
@@ -204,21 +256,29 @@ class ChaosMonkeySimulator:
                     decision_dict = node_update["final_decision"]
                     decision_obj = AgentDecision(**decision_dict)
                     
-                    # Update internal Simulator Metrics upon Judge completion
                     self._update_metrics(decision_obj, request)
+                    
+                    metrics_snapshot = {
+                        "total_revenue": self.total_revenue,
+                        "evictions": self.evictions,
+                        "trust_score": self.trust_score,
+                        "rejected_deals": self.rejected_deals,
+                        "hardware_cost": self.hardware_cost,
+                        "roi_percentage": (self.total_revenue / self.hardware_cost) * 100 if self.hardware_cost > 0 else 0
+                    }
+
+                    await self._record_tick(
+                        request.model_dump(),
+                        state.model_dump(),
+                        decision_dict,
+                        metrics_snapshot,
+                    )
                     
                     yield json.dumps({
                         "type": "final_decision",
                         "node": node_name,
                         "decision": decision_dict,
-                        "metrics": {
-                            "total_revenue": self.total_revenue,
-                            "evictions": self.evictions,
-                            "trust_score": self.trust_score,
-                            "rejected_deals": self.rejected_deals,
-                            "hardware_cost": self.hardware_cost,
-                            "roi_percentage": (self.total_revenue / self.hardware_cost) * 100 if self.hardware_cost > 0 else 0
-                        }
+                        "metrics": metrics_snapshot
                     })
 
     async def run_replay_stream(self, request: LeaseRequest, state: GPUState, policy_overrides: dict = None):
@@ -297,6 +357,8 @@ class ChaosMonkeySimulator:
         self.rejected_deals = 0
         self.hardware_cost = 250000.0
         self.tick_counter = 0
+        self.tick_history = []
+        self._history_counter = 0
 
 if __name__ == "__main__":
     console.print("[bold green]Starting Simulator...[/bold green]")

@@ -163,6 +163,27 @@ async def run_tick_stream(group_id: str = Query(default="default")):
     
     return EventSourceResponse(sse_generator())
 
+@app.get("/api/events")
+async def stream_events(group_id: str = Query(default="default")):
+    """
+    A persistent connection that 'pushes' global updates (metrics, history)
+    to the frontend in real-time using the Broadcaster pattern.
+    """
+    sim = get_simulator(group_id)
+    async def sse_generator():
+        async for msg_json in sim.subscribe():
+            yield {"data": msg_json}
+    
+    return EventSourceResponse(sse_generator())
+
+@app.get("/api/history")
+async def get_history(group_id: str = Query(default="default"), since: int = Query(default=0)):
+    """Returns completed tick history for the group. Pass ?since=<id> to get only newer ticks."""
+    sim = get_simulator(group_id)
+    if since > 0:
+        return [t for t in sim.tick_history if t["id"] > since]
+    return sim.tick_history
+
 @app.get("/api/debug/scenario")
 async def get_scenario_info(group_id: str = Query(default="default")):
     """Developer-only: returns the next scenario that will be served for this group."""

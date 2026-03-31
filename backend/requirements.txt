@@ -6,3 +6,5 @@ python-dotenv
 langgraph
 sse-starlette
 httpx
+rich
+openai
