@@ -12,6 +12,10 @@ from core.models import LeaseRequest, GPUState
 
 from simulator.chaos_monkey import ChaosMonkeySimulator
 
+# Force rich to use colors and not buffer even without a TTY
+import os
+os.environ["FORCE_COLOR"] = "1"
+
 app = FastAPI(title="GPU Pricing Agent API")
 
 class StaticCalculationPayload(BaseModel):

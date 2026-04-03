@@ -20,6 +20,8 @@ COPY backend/ .
 # Copy Vite build output into backend/static so FastAPI can serve it
 COPY --from=frontend-build /app/frontend/dist ./static
 
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--log-level", "info"]
