@@ -17,6 +17,14 @@ function getGroupId() {
 
 const GROUP_ID = getGroupId();
 
+// Read the admin secret key from the URL query param: ?admin=secret
+function getAdminKey() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('admin');
+}
+
+const ADMIN_KEY = getAdminKey();
+
 const TABS = [
   { id: 'policy', label: 'Policy Sandbox', icon: (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -55,6 +63,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [isThinking, setIsThinking] = useState(false)
   const [isAutoRunning, setIsAutoRunning] = useState(false)
+  const [adminData, setAdminData] = useState(null)
 
   const originalDecisionRef = useRef(null) 
   const lastSeenHistoryId = useRef(0);
@@ -246,6 +255,28 @@ function App() {
           controller.abort();
       };
   }, []); // Only run once on mount! No more interval loops.
+
+  // Poll admin debug data if key is present
+  useEffect(() => {
+    if (!ADMIN_KEY) return;
+    
+    let isMounted = true;
+    const fetchAdmin = async () => {
+        try {
+            const res = await fetch(`/api/admin/simulator?group_id=${GROUP_ID}&key=${ADMIN_KEY}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (isMounted) setAdminData(data);
+            }
+        } catch (e) {
+            console.error("Admin fetch failed", e);
+        }
+    };
+    
+    fetchAdmin();
+    const interval = setInterval(fetchAdmin, 5000);
+    return () => { isMounted = false; clearInterval(interval); };
+  }, [])
 
   const [agentStreamData, setAgentStreamData] = useState([])
 
@@ -583,6 +614,42 @@ function App() {
             canSave={feed.length > 0 && !isAutoRunning}
             isAutoRunning={isAutoRunning}
         />
+      )}
+
+      {/* ADMIN OVERLAY - Hidden unless ?admin=REDACTED is in URL */}
+      {ADMIN_KEY && adminData && (
+        <div className="fixed bottom-6 left-6 z-[9999] max-w-[320px] animate-slide-up">
+          <div className="bg-slate-950 border-2 border-amber-500/50 rounded-2xl shadow-[0_0_40px_rgba(245,158,11,0.2)] overflow-hidden">
+            <div className="bg-amber-500/10 border-b border-amber-500/30 px-5 py-3 flex items-center justify-between">
+              <span className="text-amber-400 font-display font-bold text-[10px] uppercase tracking-[0.2em] flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,1)]"></div>
+                 Simulation Debugger
+              </span>
+              <span className="text-slate-500 text-[10px] font-mono">ID: {GROUP_ID}</span>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <div>
+                 <label className="text-slate-500 text-[9px] font-bold uppercase tracking-wider mb-1 block">Scenario Name</label>
+                 <p className="text-white font-display font-bold text-sm leading-tight">
+                   {adminData.scenario_name || (adminData.mode === 'random' ? 'Random Walk' : 'Loading...')}
+                 </p>
+              </div>
+              <div>
+                 <label className="text-slate-500 text-[9px] font-bold uppercase tracking-wider mb-1 block">Expected Behavior</label>
+                 <p className="text-amber-200/80 text-xs font-mono leading-relaxed">
+                   {adminData.expected_behavior || adminData.message || "Awaiting next tick..."}
+                 </p>
+              </div>
+              <div className="flex justify-between items-center bg-black/40 px-3 py-2 rounded-lg border border-white/5">
+                 <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Tick Counter</span>
+                 <span className="text-amber-400 font-mono font-bold text-xs">#{adminData.tick_counter}</span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 px-4 py-1.5 bg-black/50 backdrop-blur-md rounded-full border border-white/5 text-[9px] text-slate-500 font-mono flex items-center justify-center gap-2 italic">
+             Confidential Instructor Console
+          </div>
+        </div>
       )}
 
       <PolicyComparisonModal 

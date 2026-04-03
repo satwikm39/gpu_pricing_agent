@@ -60,6 +60,9 @@ class ChaosMonkeySimulator:
         
         # Track the currently running tick so late joiners can catch up
         self.active_tick: dict = None
+        
+        # Admin Debug Info
+        self.last_scenario_info: dict = None
 
     def generate_random_state(self) -> GPUState:
         gpu = self.environment_settings["gpu_type"]
@@ -137,21 +140,23 @@ class ChaosMonkeySimulator:
         )
 
     def get_current_scenario_info(self) -> dict:
-        """Return info about the next scenario that will be served (developer debug)."""
-        if self.simulation_mode != "deterministic":
-            return {
-                "mode": "random",
-                "message": "Running in random mode — no predetermined scenario.",
+        """Return info for the admin dashboard about current/last scenario."""
+        # If we have a tick that just finished, show that.
+        # Otherwise show what's queued up.
+        scenario_to_show = self.last_scenario_info
+        if not scenario_to_show:
+            idx = self.next_scenario_idx
+            scenario = SCENARIOS[idx]
+            scenario_to_show = {
+                "scenario_name": scenario["name"],
+                "expected_behavior": scenario["expected_behavior"],
+                "is_queued": True
             }
-        idx = self.next_scenario_idx
-        scenario = SCENARIOS[idx]
+
         return {
-            "mode": "deterministic",
+            "mode": self.simulation_mode,
             "tick_counter": self.tick_counter,
-            "scenario_index": idx,
-            "scenario_name": scenario["name"],
-            "scenario_description": scenario["description"],
-            "expected_behavior": scenario["expected_behavior"],
+            **scenario_to_show
         }
 
     async def _record_tick(self, request_data: dict, state_data: dict, decision_data: dict, metrics_snapshot: dict, thoughts: list = None, initial_data: dict = None):
@@ -214,6 +219,14 @@ class ChaosMonkeySimulator:
                 f"\n[dim]Expected:[/dim] [italic]{scenario['expected_behavior']}[/italic]"
                 f"\n[bold cyan]{'─' * 60}[/bold cyan]\n"
             )
+            
+            # Store for admin dashboard BEFORE we increment/randomize
+            self.last_scenario_info = {
+                "scenario_name": scenario["name"],
+                "expected_behavior": scenario["expected_behavior"],
+                "is_queued": False
+            }
+            
             self.tick_counter += 1
             self.next_scenario_idx = random.randint(0, len(SCENARIOS) - 1)
         else:

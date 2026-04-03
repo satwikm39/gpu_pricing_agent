@@ -158,6 +158,16 @@ async def execute_tick_stream(payload: ReplayPayload, group_id: str = Query(defa
 
     return EventSourceResponse(sse_generator())
 
+@app.get("/api/admin/simulator")
+async def get_admin_simulator_state(key: str, group_id: str = Query(default="default")):
+    """Secure endpoint for instructors to monitor internal simulation state."""
+    secret = os.environ.get("ADMIN_SECRET_KEY", "secret")
+    if key != secret:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+    
+    sim = get_simulator(group_id)
+    return sim.get_current_scenario_info()
+
 @app.get("/api/tick/active")
 async def get_active_tick(group_id: str = Query(default="default")):
     """Returns the in-progress simulation tick for the group, if any."""
