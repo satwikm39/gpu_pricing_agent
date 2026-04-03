@@ -91,11 +91,33 @@ function App() {
                       if (trimmed.startsWith('data: ')) {
                           try {
                               const event = JSON.parse(trimmed.slice(6));
-                              if (event.type === 'tick_completed') {
-                                  const t = event.tick;
-                                  
-                                  // Update Metrics
-                                  setMetrics(t.metrics);
+                                if (event.type === 'initial') {
+                                    // Someone else started a tick. Switch to thinking mode unless we are the one who started it.
+                                    if (!isSyncingRef.current) { // isSyncingRef.current is a good proxy for "are we the initiator"
+                                        setAgentStreamData([]); // Reset for new session
+                                        setIsThinking(true);
+                                        setLastDealContext({ request: event.request, state: event.state });
+                                    }
+                                } else if (event.type === 'thought') {
+                                    // Append thoughts if we didn't start the tick (to avoid duplicates)
+                                    if (!isSyncingRef.current) {
+                                        setAgentStreamData(prev => [...prev, event]);
+                                    }
+                                } else if (event.type === 'tick_completed') {
+                                    const t = event.tick;
+                                    
+                                    // Update Metrics
+                                    setMetrics(t.metrics);
+                                    setIsThinking(false);
+
+                                    // Set context for Replay/Re-run for everyone
+                                    setLastDealContext({ request: t.request, state: t.state });
+                                    originalDecisionRef.current = {
+                                        action: t.decision.action,
+                                        finalPrice: t.decision.final_price_per_hour,
+                                        explanation: t.decision.explanation,
+                                        policies: t.thoughts?.[0]?.thought?.policies || null
+                                    };
 
                                   // Update Feed (prepend if new)
                                   setFeed(prev => {
@@ -142,9 +164,10 @@ function App() {
       // Initial Rehydration: Fetch current state once on mount
       const rehydrate = async () => {
           try {
-              const [metricsRes, historyRes] = await Promise.all([
+              const [metricsRes, historyRes, activeRes] = await Promise.all([
                   fetch(`/api/metrics?group_id=${GROUP_ID}`),
                   fetch(`/api/history?group_id=${GROUP_ID}`),
+                  fetch(`/api/tick/active?group_id=${GROUP_ID}`),
               ]);
               if (metricsRes.ok) setMetrics(await metricsRes.json());
               if (historyRes.ok) {
@@ -157,7 +180,35 @@ function App() {
                           decision: t.decision,
                           metrics: t.metrics,
                           _serverId: t.id,
+                          thoughts: t.thoughts || []
                       })).reverse());
+                      
+                      const lastTick = ticks[ticks.length - 1];
+                      if (lastTick.thoughts && lastTick.thoughts.length > 0) {
+                          // Combine stored initial event with thoughts and final decision for consistent display
+                          const displayThoughts = [
+                              ...(lastTick.initial ? [lastTick.initial] : []),
+                              ...lastTick.thoughts,
+                              {
+                                  type: 'final_decision',
+                                  decision: lastTick.decision,
+                                  metrics: lastTick.metrics
+                              }
+                          ];
+
+                          setAgentStreamData(displayThoughts);
+                          setLastDealContext({ request: lastTick.request, state: lastTick.state });
+                          
+                          // Policies for Re-run come from the initial event of THIS tick
+                          const tickPolicies = lastTick.initial?.policies || lastTick.thoughts?.[0]?.thought?.policies || null;
+                          
+                          originalDecisionRef.current = {
+                              action: lastTick.decision.action,
+                              finalPrice: lastTick.decision.final_price_per_hour,
+                              explanation: lastTick.decision.explanation,
+                              policies: tickPolicies
+                          };
+                      }
                       
                       setChartData(ticks.map((t, i) => {
                           const st = t.state;
@@ -170,6 +221,16 @@ function App() {
                               utilization: parseFloat(utilization.toFixed(2)),
                           };
                       }).slice(-50));
+                  }
+              }
+
+              // Check for an in-progress tick (Late Joiner Catch-up)
+              if (activeRes.ok) {
+                  const active = await activeRes.json();
+                  if (active && active.initial) {
+                      setLastDealContext({ request: active.initial.request, state: active.initial.state });
+                      setAgentStreamData(active.thoughts || []);
+                      setIsThinking(true);
                   }
               }
           } catch (e) {
@@ -248,6 +309,7 @@ function App() {
     setComparisonOpen(false);
     setComparisonData(null);
     originalDecisionRef.current = null;
+    isSyncingRef.current = true; // Mark that WE are the initiator
 
     await processStream(`/api/tick/stream?group_id=${GROUP_ID}`, {}, (data) => {
         setAgentStreamData(prev => [...prev, data]);
@@ -272,6 +334,7 @@ function App() {
             });
         }
     });
+    isSyncingRef.current = false;
   }, [loading, isThinking]);
 
   const handleReplay = useCallback(async (policyOverrides) => {
@@ -311,6 +374,7 @@ function App() {
     if (!lastDealContext || loading || isThinking) return;
 
     const modifiedRequest = { ...lastDealContext.request, bid_price_per_hour: parseFloat(newPrice) };
+    isSyncingRef.current = true;
 
     await processStream(`/api/tick/execute?group_id=${GROUP_ID}`, {
         method: 'POST',
@@ -318,8 +382,12 @@ function App() {
         body: JSON.stringify({ request: modifiedRequest, state: lastDealContext.state })
     }, (data) => {
         setAgentStreamData(prev => [...prev, data]);
-        if (data.type === 'final_decision') setMetrics(data.metrics);
+        if (data.type === 'final_decision') {
+            setMetrics(data.metrics);
+            setIsThinking(false);
+        }
     });
+    isSyncingRef.current = false;
   }, [lastDealContext, loading, isThinking]);
 
   // Handle auto-run interval
@@ -368,6 +436,17 @@ function App() {
                         {GROUP_ID}
                     </span>
                 )}
+                <button 
+                  onClick={async () => {
+                    if (window.confirm(`Reset ALL data for group "${GROUP_ID}"?`)) {
+                      await fetch(`/api/metrics/reset?group_id=${GROUP_ID}`, { method: 'POST' });
+                      window.location.reload();
+                    }
+                  }}
+                  className="ml-auto px-3 py-1 text-[10px] uppercase tracking-widest font-bold text-red-400 hover:text-white border border-red-500/30 hover:bg-red-500/20 rounded transition-all duration-300"
+                >
+                  Reset Simulation
+                </button>
             </div>
         </div>
       </header>

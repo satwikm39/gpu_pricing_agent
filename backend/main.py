@@ -103,6 +103,11 @@ async def update_environment(env: EnvironmentUpdate, group_id: str = Query(defau
     }
     return {"status": "success", "new_environment": sim.environment_settings}
 
+@app.get("/api/environment")
+async def get_environment(group_id: str = Query(default="default")):
+    """Returns the underlying hardware costs in the simulator."""
+    return get_simulator(group_id).environment_settings
+
 @app.post("/api/chaos/event")
 async def trigger_chaos_event(event: ChaosEvent, group_id: str = Query(default="default")):
     """Overrides the Chaos Monkey's current simulation mode."""
@@ -152,6 +157,11 @@ async def execute_tick_stream(payload: ReplayPayload, group_id: str = Query(defa
             yield {"data": chunk_json}
 
     return EventSourceResponse(sse_generator())
+
+@app.get("/api/tick/active")
+async def get_active_tick(group_id: str = Query(default="default")):
+    """Returns the in-progress simulation tick for the group, if any."""
+    return get_simulator(group_id).active_tick
 
 @app.get("/api/tick/stream")
 async def run_tick_stream(group_id: str = Query(default="default")):

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Read the same group ID used by App.jsx so all API calls stay consistent.
 const GROUP_ID = new URLSearchParams(window.location.search).get('group') || 'default';
@@ -23,6 +23,41 @@ const PolicyControls = () => {
 
     const [envSaving, setEnvSaving] = useState(false);
     const [envSaved, setEnvSaved] = useState(false);
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const [settingsRes, envRes] = await Promise.all([
+                    fetch(`/api/settings?group_id=${GROUP_ID}`),
+                    fetch(`/api/environment?group_id=${GROUP_ID}`)
+                ]);
+
+                if (settingsRes.ok) {
+                    const data = await settingsRes.json();
+                    
+                    // Parse backend strings ("15%", "$1.50") back into range values
+                    const parsed = {
+                        min_margin: data.min_margin.replace('%', ''),
+                        scarcity_threshold: data.scarcity_threshold,
+                        scarcity_multiplier: data.scarcity_multiplier,
+                        max_market_premium: data.max_market_premium.replace('%', ''),
+                        eviction_delta: data.eviction_delta.replace('$', ''),
+                        post_roi_discount_floor: data.post_roi_discount_floor.replace('%', '')
+                    };
+                    setSettings(parsed);
+                }
+
+                if (envRes.ok) {
+                    const envData = await envRes.json();
+                    setEnvSettings(envData);
+                }
+            } catch (err) {
+                console.error("Failed to rehydrate policy settings", err);
+            }
+        };
+
+        fetchSettings();
+    }, []);
 
     const handleChange = (e) => {
         setSettings({
