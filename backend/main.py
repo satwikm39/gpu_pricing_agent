@@ -18,6 +18,14 @@ os.environ["FORCE_COLOR"] = "1"
 
 app = FastAPI(title="GPU Pricing Agent API")
 
+# Silence health check logs from AWS App Runner
+import logging
+class HealthCheckFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "GET /api/metrics" not in record.getMessage()
+
+logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
+
 class StaticCalculationPayload(BaseModel):
     request: LeaseRequest
     state: GPUState
