@@ -566,12 +566,15 @@ function App() {
                 </button>
             </div>
 
+            {/* Silenced Hardware ROI & Metrics Panel per request */}
+            {/*
             <div className="glass-panel w-full p-5 glow-top">
                 <div className="flex flex-col lg:flex-row gap-5 items-center">
                     <div className="w-full lg:w-1/3 shrink-0"><ROIMeter metrics={metrics} /></div>
                     <div className="w-full lg:w-2/3"><MetricCards metrics={metrics} /></div>
                 </div>
             </div>
+            */}
 
             <div className="flex flex-col xl:flex-row gap-5 w-full items-start">
                 <div className="flex-1 flex flex-col gap-5 w-full">
@@ -600,7 +603,7 @@ function App() {
                     </div>
                 </div>
                 
-                <div className="w-full xl:w-[420px] 2xl:w-[480px] shrink-0 h-full z-30">
+                <div className="w-full xl:w-[420px] 2xl:w-[480px] shrink-0 h-[85vh] xl:sticky xl:top-6 z-30">
                     <AgentSidebar 
                         streamData={agentStreamData} 
                         isThinking={isThinking}
