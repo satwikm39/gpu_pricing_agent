@@ -3,8 +3,7 @@ import MetricCards from './components/MetricCards'
 import LiveFeed from './components/LiveFeed'
 import ROIMeter from './components/ROIMeter'
 import PolicyControls from './components/PolicyControls'
-import TimeSeriesChart from './components/TimeSeriesChart'
-import FleetROIDistribution from './components/FleetROIDistribution'
+import ChatbotPlayground from './components/ChatbotPlayground'
 import AgentSidebar from './components/AgentSidebar'
 import PolicyComparisonModal from './components/PolicyComparisonModal'
 import WarGamesPanel from './components/WarGamesPanel'
@@ -55,8 +54,8 @@ function App() {
     roi_percentage: 0
   })
   const [feed, setFeed] = useState([])
-  const [chartData, setChartData] = useState([])
   const [savedRuns, setSavedRuns] = useState([])
+  const [chatMessages, setChatMessages] = useState([])
   const [lastDealContext, setLastDealContext] = useState(null)
   const [comparisonData, setComparisonData] = useState(null)
   const [comparisonOpen, setComparisonOpen] = useState(false)
@@ -106,6 +105,7 @@ function App() {
                                         setAgentStreamData([]); // Reset for new session
                                         setIsThinking(true);
                                         setLastDealContext({ request: event.request, state: event.state });
+                                        setChatMessages([]);
                                     }
                                 } else if (event.type === 'thought') {
                                     // Append thoughts if we didn't start the tick (to avoid duplicates)
@@ -119,7 +119,7 @@ function App() {
                                     setMetrics(t.metrics);
                                     setIsThinking(false);
 
-                                    // Set context for Replay/Re-run for everyone
+                                    // Maintain robust metrics
                                     setLastDealContext({ request: t.request, state: t.state });
                                     originalDecisionRef.current = {
                                         action: t.decision.action,
@@ -141,20 +141,6 @@ function App() {
                                       }, ...prev];
                                   });
 
-                                  // Update Chart Data
-                                  setChartData(prev => {
-                                      const st = t.state;
-                                      const utilization = st && st.total_inventory > 0
-                                          ? ((st.total_inventory - st.available_inventory) / st.total_inventory) * 100
-                                          : 0;
-                                          
-                                      const newPoint = {
-                                          tick: (prev.length > 0 ? (prev[prev.length - 1].tick + 1) : 1),
-                                          revenue: t.metrics.total_revenue,
-                                          utilization: parseFloat(utilization.toFixed(2)),
-                                      };
-                                      return [...prev, newPoint].slice(-50);
-                                  });
                               }
                           } catch (e) {
                               console.error("Event parse error", e);
@@ -207,6 +193,7 @@ function App() {
 
                           setAgentStreamData(displayThoughts);
                           setLastDealContext({ request: lastTick.request, state: lastTick.state });
+                          setChatMessages([]);
                           
                           // Policies for Re-run come from the initial event of THIS tick
                           const tickPolicies = lastTick.initial?.policies || lastTick.thoughts?.[0]?.thought?.policies || null;
@@ -218,18 +205,6 @@ function App() {
                               policies: tickPolicies
                           };
                       }
-                      
-                      setChartData(ticks.map((t, i) => {
-                          const st = t.state;
-                          const utilization = st && st.total_inventory > 0
-                              ? ((st.total_inventory - st.available_inventory) / st.total_inventory) * 100
-                              : 0;
-                          return {
-                              tick: i + 1,
-                              revenue: t.metrics.total_revenue,
-                              utilization: parseFloat(utilization.toFixed(2)),
-                          };
-                      }).slice(-50));
                   }
               }
 
@@ -345,6 +320,11 @@ function App() {
     await processStream(`/api/tick/stream?group_id=${GROUP_ID}`, {}, (data) => {
         setAgentStreamData(prev => [...prev, data]);
         
+        if (data.type === 'initial') {
+            setLastDealContext({ request: data.request, state: data.state });
+            setChatMessages([]);
+        }
+        
         if (data.type === 'final_decision') {
             setMetrics(data.metrics);
             // We use the function form of setAgentStreamData, so we need to look back at the accumulated state for decision mapping
@@ -352,7 +332,6 @@ function App() {
                  if (data.type === 'final_decision' && !data.is_replay) {
                     const initialEvent = current.find(d => d.type === 'initial');
                     if (initialEvent) {
-                        setLastDealContext({ request: initialEvent.request, state: initialEvent.state });
                         originalDecisionRef.current = {
                             action: data.decision.action,
                             finalPrice: data.decision.final_price_per_hour,
@@ -413,6 +392,12 @@ function App() {
         body: JSON.stringify({ request: modifiedRequest, state: lastDealContext.state })
     }, (data) => {
         setAgentStreamData(prev => [...prev, data]);
+        
+        if (data.type === 'initial') {
+            setLastDealContext({ request: data.request, state: data.state });
+            setChatMessages([]);
+        }
+        
         if (data.type === 'final_decision') {
             setMetrics(data.metrics);
             setIsThinking(false);
@@ -436,11 +421,10 @@ function App() {
   const saveCurrentRun = async () => {
       if (feed.length === 0) return;
       const runName = `Run ${savedRuns.length + 1} (${feed.length} Ticks)`;
-      const newRun = { name: runName, metrics: { ...metrics }, chartData: [...chartData] };
+      const newRun = { name: runName, metrics: { ...metrics } };
       setSavedRuns(prev => [...prev, newRun]);
       
       setFeed([]);
-      setChartData([]);
       lastSeenHistoryId.current = 0;
       try {
           await fetch(`/api/metrics/reset?group_id=${GROUP_ID}`, { method: 'POST' });
@@ -565,9 +549,8 @@ function App() {
 
             <div className="flex flex-col xl:flex-row gap-5 w-full items-start">
                 <div className="flex-1 flex flex-col gap-5 w-full">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 w-full shrink-0">
-                        <div className="glass-panel p-1 sm:p-3 min-h-[380px] flex flex-col"><TimeSeriesChart data={chartData} /></div>
-                        <div className="glass-panel p-1 sm:p-3 min-h-[380px] flex flex-col"><FleetROIDistribution /></div>
+                    <div className="w-full shrink-0 h-[400px]">
+                        <ChatbotPlayground lastDealContext={lastDealContext} chatMessages={chatMessages} setChatMessages={setChatMessages} />
                     </div>
                     <div className="glass-panel w-full flex-col flex flex-1 mt-0 glow-top min-h-[500px]">
                         <div className="px-6 py-4 border-b border-white/10 bg-slate-900/60 flex justify-between items-center z-10 sticky top-0">

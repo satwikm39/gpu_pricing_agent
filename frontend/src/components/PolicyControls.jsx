@@ -12,25 +12,13 @@ const PolicyControls = () => {
         eviction_delta: '1.50',
         post_roi_discount_floor: '50'
     });
-    const [envSettings, setEnvSettings] = useState({
-        gpu_type: 'H100',
-        depreciation_cost: 1.00,
-        power_opex: 0.50
-    });
-    
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
-
-    const [envSaving, setEnvSaving] = useState(false);
-    const [envSaved, setEnvSaved] = useState(false);
 
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const [settingsRes, envRes] = await Promise.all([
-                    fetch(`/api/settings?group_id=${GROUP_ID}`),
-                    fetch(`/api/environment?group_id=${GROUP_ID}`)
-                ]);
+                const settingsRes = await fetch(`/api/settings?group_id=${GROUP_ID}`);
 
                 if (settingsRes.ok) {
                     const data = await settingsRes.json();
@@ -46,11 +34,6 @@ const PolicyControls = () => {
                     };
                     setSettings(parsed);
                 }
-
-                if (envRes.ok) {
-                    const envData = await envRes.json();
-                    setEnvSettings(envData);
-                }
             } catch (err) {
                 console.error("Failed to rehydrate policy settings", err);
             }
@@ -65,30 +48,6 @@ const PolicyControls = () => {
             [e.target.name]: e.target.value
         });
         setSaved(false);
-    };
-
-    const handleEnvChange = (e) => {
-        const { value } = e.target;
-        
-        // Define hardcoded business defaults based on GPU tier
-        const gpuConfig = {
-            'B200': { dep: 2.50, opex: 1.25 },
-            'H200': { dep: 1.50, opex: 0.75 },
-            'H100': { dep: 1.00, opex: 0.50 },
-            'A100': { dep: 0.60, opex: 0.35 },
-            'L40S': { dep: 0.30, opex: 0.20 },
-            'V100': { dep: 0.15, opex: 0.10 },
-            'RTX4090': { dep: 0.05, opex: 0.05 }
-        };
-        
-        const config = gpuConfig[value] || gpuConfig['H100'];
-
-        setEnvSettings({
-            gpu_type: value,
-            depreciation_cost: config.dep,
-            power_opex: config.opex
-        });
-        setEnvSaved(false);
     };
 
     const handleSave = async () => {
@@ -114,23 +73,6 @@ const PolicyControls = () => {
             console.error(err);
         } finally {
             setSaving(false);
-        }
-    };
-
-    const handleEnvSave = async () => {
-        setEnvSaving(true);
-        try {
-            await fetch(`/api/environment?group_id=${GROUP_ID}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(envSettings)
-            });
-            setEnvSaved(true);
-            setTimeout(() => setEnvSaved(false), 2000);
-        } catch(err) {
-            console.error(err);
-        } finally {
-            setEnvSaving(false);
         }
     };
 
@@ -272,65 +214,6 @@ const PolicyControls = () => {
                             className={`w-full py-3 mt-2 rounded-lg font-bold text-sm transition-all duration-300 shadow-lg ${saved ? 'bg-green-600/90 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)]' : 'bg-gradient-to-r from-accent-600 to-accent-500 hover:from-accent-500 hover:to-accent-400 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)]'}`}
                         >
                             {saving ? 'Syncing...' : saved ? '✓ Policy Live!' : 'Deploy New Policies'}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Hardware Portfolio */}
-                <div className="w-full xl:w-[380px] shrink-0">
-                    <div className="glass-panel p-6 flex flex-col gap-4 relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none"></div>
-                        <h3 className="text-xl font-display font-bold text-white mb-2 flex items-center gap-3 relative z-10">
-                            <div className="bg-blue-500/20 p-2 rounded-xl border border-blue-500/30">
-                                <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                            </div>
-                            Hardware Portfolio
-                        </h3>
-
-                        <div className="relative z-10">
-                            <select 
-                                name="gpu_type"
-                                value={envSettings.gpu_type}
-                                onChange={handleEnvChange}
-                                className="w-full bg-slate-900/80 text-white font-mono font-medium border border-blue-500/30 rounded-lg p-3 text-sm focus:border-blue-400 focus:outline-none transition-colors shadow-inner appearance-none cursor-pointer"
-                            >
-                                <option value="B200">NVIDIA B200 (Blackwell AI) • 250 Units</option>
-                                <option value="H200">NVIDIA H200 (Advanced Gen AI) • 500 Units</option>
-                                <option value="H100">NVIDIA H100 (High-End Gen AI) • 1,000 Units</option>
-                                <option value="A100">NVIDIA A100 (Legacy Training) • 2,500 Units</option>
-                                <option value="L40S">NVIDIA L40S (Inference/Graphics) • 5,000 Units</option>
-                                <option value="V100">NVIDIA V100 (Budget Compute) • 8,000 Units</option>
-                                <option value="RTX4090">NVIDIA RTX 4090 (Consumer GPU) • 15,000 Units</option>
-                            </select>
-                            <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                            </div>
-                        </div>
-                        
-                        <div className="flex gap-4 p-3 bg-black/20 rounded-lg border border-white/5 relative z-10">
-                            <div className="flex-1">
-                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Amortized CAPEX</p>
-                                <p className="font-mono text-sm text-blue-300 flex items-center gap-1">
-                                    ${envSettings.depreciation_cost.toFixed(2)}<span className="text-slate-500 text-[10px]">/hr</span>
-                                </p>
-                            </div>
-                            <div className="w-px bg-slate-700/50"></div>
-                            <div className="flex-1">
-                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Power OPEX</p>
-                                <p className="font-mono text-sm text-blue-300 flex items-center gap-1">
-                                    ${envSettings.power_opex.toFixed(2)}<span className="text-slate-500 text-[10px]">/hr</span>
-                                </p>
-                            </div>
-                        </div>
-
-                        <button 
-                            onClick={handleEnvSave}
-                            disabled={envSaving || envSaved}
-                            className={`w-full py-3 mt-1 rounded-lg font-bold text-[13px] tracking-wide uppercase transition-all duration-300 shadow-lg relative z-10 ${envSaved ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600'}`}
-                        >
-                            {envSaving ? 'Syncing...' : envSaved ? '✓ Portfolio Assigned' : 'Deploy Hardware Selection'}
                         </button>
                     </div>
                 </div>

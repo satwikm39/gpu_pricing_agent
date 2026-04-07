@@ -70,7 +70,7 @@ Do not write paragraphs. Use this exact structure:
             ("user", "Evaluate this request.")
         ])
 
-    def evaluate_quote(self, 
+    async def evaluate_quote(self, 
                       request: LeaseRequest, 
                       quote: ComputedQuote, 
                       gpu_state: GPUState,
@@ -87,8 +87,7 @@ Do not write paragraphs. Use this exact structure:
         inv_pct = (gpu_state.available_inventory / gpu_state.total_inventory) * 100 if gpu_state.total_inventory > 0 else 0
         
         try:
-            # We don't have async here for simplicity of the CLI simulator
-            decision: AgentDecision = self.prompt_template.pipe(self.llm).invoke({
+            decision: AgentDecision = await self.prompt_template.pipe(self.llm).ainvoke({
                 "min_margin": policy_thresholds.get("min_margin", "10%"),
                 "scarcity_threshold": policy_thresholds.get("scarcity_threshold", "10"),
                 "scarcity_multiplier": policy_thresholds.get("scarcity_multiplier", "2.5"),

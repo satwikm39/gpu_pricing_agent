@@ -6,3 +6,4 @@ venv
 # Frontend
 node_modules
 yarn-error.log
+.vscode
