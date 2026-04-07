@@ -406,6 +406,32 @@ function App() {
     isSyncingRef.current = false;
   }, [lastDealContext, loading, isThinking]);
 
+  const handleRunScenario = useCallback(async (request, state) => {
+    if (loading || isThinking) return;
+
+    isSyncingRef.current = true;
+    setActiveTab('simulation'); // Force switch tab
+
+    await processStream(`/api/tick/execute?group_id=${GROUP_ID}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request, state })
+    }, (data) => {
+        setAgentStreamData(prev => [...prev, data]);
+        
+        if (data.type === 'initial') {
+            setLastDealContext({ request: data.request, state: data.state });
+            setChatMessages([]);
+        }
+        
+        if (data.type === 'final_decision') {
+            setMetrics(data.metrics);
+            setIsThinking(false);
+        }
+    });
+    isSyncingRef.current = false;
+  }, [loading, isThinking]);
+
   // Handle auto-run interval
   useEffect(() => {
     let interval;
@@ -596,6 +622,7 @@ function App() {
             onSaveRun={saveCurrentRun}
             canSave={feed.length > 0 && !isAutoRunning}
             isAutoRunning={isAutoRunning}
+            onRunScenario={handleRunScenario}
         />
       )}
 

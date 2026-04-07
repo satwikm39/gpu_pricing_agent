@@ -14,6 +14,7 @@ from core.calculator import ComputationLayer
 from core.agent import PolicyAgent
 
 from simulator.chaos_monkey import ChaosMonkeySimulator
+from simulator.scenarios import SCENARIOS
 
 # Force rich to use colors and not buffer even without a TTY
 import os
@@ -238,6 +239,21 @@ async def get_history(group_id: str = Query(default="default"), since: int = Que
 async def get_scenario_info(group_id: str = Query(default="default")):
     """Developer-only: returns the next scenario that will be served for this group."""
     return get_simulator(group_id).get_current_scenario_info()
+
+@app.get("/api/scenarios/all")
+async def get_all_scenarios():
+    """Returns all hardcoded developer scenarios for the War Games library UI."""
+    out = []
+    for i, s in enumerate(SCENARIOS):
+        out.append({
+            "id": i,
+            "name": s["name"],
+            "description": s["description"],
+            "expected_behavior": s["expected_behavior"],
+            "gpu_state": s["gpu_state"].model_dump(),
+            "request": s["request"].model_dump()
+        })
+    return out
 
 @app.post("/api/chat")
 async def process_chat(payload: ChatbotRequest, group_id: str = Query(default="default")):
