@@ -6,26 +6,37 @@ const LiveFeed = ({ data }) => {
     const isApprove = decision.action === 'APPROVE';
     const isOverride = decision.action === 'OVERRIDE';
     const isEvict = decision.action === 'EVICT';
-
     const isReject = decision.action === 'REJECT';
 
+    const isOnDemand = request.workload_type === 'On-Demand';
+    const isSpot = request.workload_type === 'Spot';
+
+    // OPEX + CAPEX + 20% Margin
+    const basePrice = (state.depreciation_cost_per_hour + state.power_opex_per_hour) * 1.20;
+
+    const actionBadge = (() => {
+        if (isOnDemand && isOverride) return 'MODIFIED';
+        if (isEvict) return 'APPROVE w/ EVICTION';
+        return decision.action;
+    })();
+
     const getBorderColor = () => {
-        if (isEvict || isReject) return 'border-red-500/50';
+        if (isReject) return 'border-red-500/50';
         if (isOverride) return 'border-yellow-500/50';
-        if (isApprove) return 'border-green-500/50';
+        if (isApprove || isEvict) return 'border-green-500/50';
         return 'border-slate-500/50';
     };
 
     const getBadgeColor = () => {
-        if (isEvict || isReject) return 'bg-red-500/20 text-red-400 border-red-500/30';
+        if (isReject) return 'bg-red-500/20 text-red-400 border-red-500/30';
         if (isOverride) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-        if (isApprove) return 'bg-green-500/20 text-green-400 border-green-500/30';
+        if (isApprove || isEvict) return 'bg-green-500/20 text-green-400 border-green-500/30';
         return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
     };
 
-    const priceLabel = isReject && request.workload_type === 'Spot' ? 'Rejected Bid Price' : 
+    const priceLabel = isReject && isSpot ? 'Rejected Bid Price' : 
                        isReject ? 'Baseline Price (Rejected)' : 'Final Executed Price';
-    const displayPrice = isReject && request.workload_type === 'Spot' && request.bid_price_per_hour
+    const displayPrice = isReject && isSpot && request.bid_price_per_hour
                        ? request.bid_price_per_hour
                        : decision.final_price_per_hour;
 
@@ -74,26 +85,52 @@ const LiveFeed = ({ data }) => {
                         )}
                     </div>
                     <h3 className="text-2xl font-display font-bold text-white mt-3 flex items-center gap-3">
-                        {request.quantity}x {request.workload_type}
+                        {request.quantity}x <span className={`px-2 py-0.5 rounded text-sm uppercase tracking-widest ${isSpot ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>{request.workload_type}</span>
                         <span className="text-slate-400 font-sans font-normal text-sm tracking-wider uppercase">({request.duration_hours}h req)</span>
                     </h3>
                 </div>
                 <div className="text-right flex flex-col items-end">
                     <div className={`px-5 py-2 rounded-lg text-sm font-display font-bold border ${getBadgeColor()} uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(0,0,0,0.2)] backdrop-blur-sm`}>
-                        {decision.action}
+                        {actionBadge}
                     </div>
                 </div>
             </div>
             <div className={`flex justify-between items-center py-3 mt-2 mb-2 bg-slate-900/60 rounded-xl px-5 border border-dashed hover:border-solid transition-all ${getBorderColor()} shadow-inner`}>
-                <span className={`font-display font-bold uppercase tracking-[0.1em] text-xs flex items-center gap-2 ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : isEvict || isReject ? 'text-red-400' : 'text-slate-400'}`}>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                    </svg>
-                    {priceLabel}
-                </span>
-                <span className={`font-mono font-bold text-xl drop-shadow-md ${isApprove ? 'text-green-400' : isOverride ? 'text-yellow-400' : isEvict || isReject ? 'text-red-400' : 'text-slate-400'}`}>
-                    ${displayPrice.toFixed(2)} <span className={`text-sm opacity-80 ${isApprove ? 'text-green-500' : isOverride ? 'text-yellow-500' : isEvict || isReject ? 'text-red-500' : 'text-slate-500'}`}>/hr</span>
-                </span>
+                {isOnDemand && isOverride ? (
+                    <div className="w-full flex justify-between items-center">
+                        <div className="flex flex-col">
+                            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Base Price</span>
+                            <span className="text-slate-400 font-mono text-lg line-through decoration-red-500/50">${basePrice.toFixed(2)}<span className="text-xs">/hr</span></span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-yellow-400 text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                Offered Price
+                            </span>
+                            <span className="text-yellow-400 font-mono font-bold text-xl drop-shadow-md">${displayPrice.toFixed(2)}<span className="text-sm opacity-80">/hr</span></span>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <span className={`font-display font-bold uppercase tracking-[0.1em] text-xs flex items-center gap-2 ${isApprove || isEvict ? 'text-green-400' : isOverride ? 'text-yellow-400' : isReject ? 'text-red-400' : 'text-slate-400'}`}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                            </svg>
+                            {priceLabel}
+                        </span>
+                        <div className="flex items-center gap-6">
+                            {!isReject && (
+                                <div className="flex flex-col items-end border-r border-white/10 pr-6">
+                                    <span className="text-slate-500 text-[9px] uppercase font-bold tracking-widest">Base Price</span>
+                                    <span className="text-slate-400 font-mono text-sm">${basePrice.toFixed(2)}<span className="text-[10px]">/hr</span></span>
+                                </div>
+                            )}
+                            <span className={`font-mono font-bold text-xl drop-shadow-md ${isApprove || isEvict ? 'text-green-400' : isOverride ? 'text-yellow-400' : isReject ? 'text-red-400' : 'text-slate-400'}`}>
+                                ${displayPrice.toFixed(2)} <span className={`text-sm opacity-80 ${isApprove || isEvict ? 'text-green-500' : isOverride ? 'text-yellow-500' : isReject ? 'text-red-500' : 'text-slate-500'}`}>/hr</span>
+                            </span>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Glass Box Explanation */}

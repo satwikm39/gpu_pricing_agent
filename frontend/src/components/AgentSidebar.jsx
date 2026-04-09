@@ -204,22 +204,34 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onExe
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     Incoming Deal Context
                                 </h3>
-                                <div className="text-slate-300 text-sm font-mono flex flex-col gap-1.5 bg-black/20 p-3 rounded-lg border border-white/5">
-                                    <p className="flex justify-between"><span className="text-slate-500">Request:</span> <span>{initialContext.request.quantity}x {initialContext.request.gpu_type} ({initialContext.request.duration_hours}h)</span></p>
-                                    <p className="flex justify-between"><span className="text-slate-500">Type:</span> <span>{initialContext.request.workload_type}</span></p>
-                                    {initialContext.request.workload_type === 'Spot' && initialContext.request.bid_price_per_hour && (
-                                        <p className="flex justify-between"><span className="text-slate-500">Bid Price:</span> <span className="text-yellow-400 font-bold">${initialContext.request.bid_price_per_hour.toFixed(2)}/hr</span></p>
-                                    )}
-                                    <p className="flex justify-between"><span className="text-slate-500">Avail:</span> <span>{initialContext.state.available_inventory} / {initialContext.state.total_inventory}</span></p>
-                                    
-                                    <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between">
-                                        <span className="text-pink-400/80 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_5px_rgba(236,72,153,0.8)] animate-pulse"></div>
-                                            {initialContext.state.market_competitor_name} (Mkt)
-                                        </span>
-                                        <span className="text-pink-400 font-bold">${initialContext.state.market_price_per_hour.toFixed(2)}/hr</span>
-                                    </div>
-                                </div>
+                                {(() => {
+                                    const basePrice = (initialContext.state.depreciation_cost_per_hour + initialContext.state.power_opex_per_hour) * 1.20;
+                                    const isSpot = initialContext.request.workload_type === 'Spot';
+                                    return (
+                                        <div className="text-slate-300 text-sm font-mono flex flex-col gap-1.5 bg-black/20 p-3 rounded-lg border border-white/5">
+                                            <p className="flex justify-between"><span className="text-slate-500">Request:</span> <span>{initialContext.request.quantity}x {initialContext.request.gpu_type} ({initialContext.request.duration_hours}h)</span></p>
+                                            <p className="flex justify-between items-center">
+                                                <span className="text-slate-500">Type:</span> 
+                                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-widest ${isSpot ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
+                                                    {initialContext.request.workload_type}
+                                                </span>
+                                            </p>
+                                            <p className="flex justify-between items-center"><span className="text-slate-500">Base Math:</span> <span className="text-emerald-400 font-bold">${basePrice.toFixed(2)}/hr</span></p>
+                                            {isSpot && initialContext.request.bid_price_per_hour && (
+                                                <p className="flex justify-between items-center"><span className="text-slate-500">Spot Bid:</span> <span className="text-yellow-400 font-bold">${initialContext.request.bid_price_per_hour.toFixed(2)}/hr</span></p>
+                                            )}
+                                            <p className="flex justify-between"><span className="text-slate-500">Avail:</span> <span>{initialContext.state.available_inventory} / {initialContext.state.total_inventory}</span></p>
+                                            
+                                            <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between">
+                                                <span className="text-pink-400/80 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_5px_rgba(236,72,153,0.8)] animate-pulse"></div>
+                                                    {initialContext.state.market_competitor_name} (Mkt)
+                                                </span>
+                                                <span className="text-pink-400 font-bold">${initialContext.state.market_price_per_hour.toFixed(2)}/hr</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
                         
@@ -252,25 +264,41 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onExe
                                     </svg>
                                     Final Executed Verdict
                                 </h3>
-                                <div className="text-sm">
-                                    <p className="mb-1">
-                                        <span className="text-slate-400">Action:</span> 
-                                        <span className={`font-bold ml-2 ${finalDecision.decision.action === 'APPROVE' ? 'text-green-400' : finalDecision.decision.action === 'OVERRIDE' ? 'text-yellow-400' : 'text-red-400'}`}>
-                                            {finalDecision.decision.action}
-                                        </span>
-                                    </p>
-                                    <p className="mb-1">
-                                        <span className="text-slate-400">
-                                            {finalDecision.decision.action === 'REJECT' && initialContext?.request?.workload_type === 'Spot' ? 'Rejected Bid Price:' : 
-                                             finalDecision.decision.action === 'REJECT' ? 'Baseline Price (Rejected):' : 'Final Price:'}
-                                        </span> 
-                                        <span className="text-white font-bold ml-2">
-                                            ${(finalDecision.decision.action === 'REJECT' && initialContext?.request?.workload_type === 'Spot' && initialContext?.request?.bid_price_per_hour 
-                                                ? initialContext.request.bid_price_per_hour 
-                                                : finalDecision.decision.final_price_per_hour).toFixed(2)}/hr
-                                        </span>
-                                    </p>
-                                </div>
+                                {(() => {
+                                    const isSpot = initialContext?.request?.workload_type === 'Spot';
+                                    
+                                    let actionLabel = finalDecision.decision.action;
+                                    if (initialContext?.request?.workload_type === 'On-Demand' && finalDecision.decision.action === 'OVERRIDE') {
+                                        actionLabel = 'MODIFIED';
+                                    } else if (finalDecision.decision.action === 'EVICT') {
+                                        actionLabel = 'APPROVE w/ EVICTION';
+                                    }
+
+                                    const isApprove = finalDecision.decision.action === 'APPROVE' || finalDecision.decision.action === 'EVICT';
+                                    const textColor = isApprove ? 'text-green-400' : finalDecision.decision.action === 'OVERRIDE' ? 'text-yellow-400' : 'text-red-400';
+
+                                    return (
+                                        <div className="text-sm">
+                                            <p className="mb-1">
+                                                <span className="text-slate-400">Action:</span> 
+                                                <span className={`font-bold ml-2 ${textColor}`}>
+                                                    {actionLabel}
+                                                </span>
+                                            </p>
+                                            <p className="mb-1">
+                                                <span className="text-slate-400">
+                                                    {finalDecision.decision.action === 'REJECT' && isSpot ? 'Rejected Bid Price:' : 
+                                                     finalDecision.decision.action === 'REJECT' ? 'Baseline Price (Rejected):' : 'Final Price:'}
+                                                </span> 
+                                                <span className="text-white font-bold ml-2">
+                                                    ${(finalDecision.decision.action === 'REJECT' && isSpot && initialContext?.request?.bid_price_per_hour 
+                                                        ? initialContext.request.bid_price_per_hour 
+                                                        : finalDecision.decision.final_price_per_hour).toFixed(2)}/hr
+                                                </span>
+                                            </p>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
                         
