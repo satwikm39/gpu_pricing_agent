@@ -53,7 +53,7 @@ SCENARIOS: list[dict] = [
         "description": "Price would fall below the margin floor — tests Policy A.",
         "expected_behavior": "OVERRIDE to floor — Conservative Agent enforces min_margin.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="A100",
             total_inventory=1000,
             available_inventory=600,
             active_spot_leases=30,
@@ -66,7 +66,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC02",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="A100",
             quantity=2,
             duration_hours=1,
             workload_type="On-Demand",
@@ -79,7 +79,7 @@ SCENARIOS: list[dict] = [
         "description": "Only 5% inventory left — tests Policy B (scarcity multiplier).",
         "expected_behavior": "OVERRIDE to ~$3.60 — scarcity multiplier (3.0x) triggers, but Policy E caps it at 20% above market ($3.00).",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="L40S",
             total_inventory=1000,
             available_inventory=50,
             active_spot_leases=100,
@@ -92,7 +92,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC03",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="L40S",
             quantity=8,
             duration_hours=168,
             workload_type="On-Demand",
@@ -105,7 +105,7 @@ SCENARIOS: list[dict] = [
         "description": "Zero available GPUs, many active spot leases — tests Policy C (eviction).",
         "expected_behavior": "EVICT at ~$4.56 — 0 inventory forces eviction of spot lease. Scarcity surge capped by Policy E at 20% above market ($3.80).",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="V100",
             total_inventory=1000,
             available_inventory=0,
             active_spot_leases=200,
@@ -118,7 +118,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC04",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="V100",
             quantity=4,
             duration_hours=24,
             workload_type="On-Demand",
@@ -131,7 +131,7 @@ SCENARIOS: list[dict] = [
         "description": "Hardware cost recovered — tests Policy D (lifecycle aggression).",
         "expected_behavior": "REJECT — $0.90 bid is 50% below the $1.80 baseline. Conservative Agent enforces margin floor even with cost recovered.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="H200",
             total_inventory=1000,
             available_inventory=300,
             active_spot_leases=40,
@@ -144,7 +144,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC05",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="H200",
             quantity=2,
             duration_hours=1,
             workload_type="Spot",
@@ -157,7 +157,7 @@ SCENARIOS: list[dict] = [
         "description": "Proposed price far above competitor — tests Policy E (market premium cap).",
         "expected_behavior": "OVERRIDE to ceiling — Market Monitor caps price to stay competitive.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="RTX4090",
             total_inventory=1000,
             available_inventory=400,
             active_spot_leases=60,
@@ -170,7 +170,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC06",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="RTX4090",
             quantity=6,
             duration_hours=168,
             workload_type="On-Demand",
@@ -183,7 +183,7 @@ SCENARIOS: list[dict] = [
         "description": "Absurdly low spot bid, cost NOT recovered — tests Policy A + D.",
         "expected_behavior": "REJECT — bid far below cost floor, no ROI discount applies.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="B200",
             total_inventory=1000,
             available_inventory=700,
             active_spot_leases=20,
@@ -196,7 +196,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC07",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="B200",
             quantity=1,
             duration_hours=24,
             workload_type="Spot",
@@ -235,7 +235,7 @@ SCENARIOS: list[dict] = [
         "description": "Massive oversupply, low market price — tests Policy E + A.",
         "expected_behavior": "REJECT — $0.60 bid is too far below $1.80 baseline (66% discount). Conservative Agent protects margin even in oversupply.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="A100",
             total_inventory=1000,
             available_inventory=950,
             active_spot_leases=10,
@@ -248,7 +248,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC09",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="A100",
             quantity=4,
             duration_hours=24,
             workload_type="Spot",
@@ -261,7 +261,7 @@ SCENARIOS: list[dict] = [
         "description": "Price sits right at the margin boundary — tests agent debate.",
         "expected_behavior": "Agent debate — Conservative and Opportunistic clash at the boundary.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="L40S",
             total_inventory=1000,
             available_inventory=400,
             active_spot_leases=50,
@@ -274,7 +274,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC10",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="L40S",
             quantity=2,
             duration_hours=24,
             workload_type="On-Demand",
@@ -287,7 +287,7 @@ SCENARIOS: list[dict] = [
         "description": "Large request, long duration, moderate scarcity — massive revenue opportunity.",
         "expected_behavior": "OVERRIDE to ~$3.00 — undercuts CoreWeave ($3.50) while maintaining strong margin above $1.73 floor. 8×168h = $4,032 revenue.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="V100",
             total_inventory=1000,
             available_inventory=200,
             active_spot_leases=80,
@@ -300,7 +300,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC11",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="V100",
             quantity=8,
             duration_hours=168,
             workload_type="On-Demand",
@@ -313,7 +313,7 @@ SCENARIOS: list[dict] = [
         "description": "Zero inventory + cost recovered — tests Policy C + D interaction.",
         "expected_behavior": "EVICT — 0 inventory forces eviction. Cost recovered softens impact. Policy C + D interaction.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="H200",
             total_inventory=1000,
             available_inventory=0,
             active_spot_leases=500,
@@ -326,7 +326,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC12",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="H200",
             quantity=4,
             duration_hours=24,
             workload_type="On-Demand",
@@ -339,7 +339,7 @@ SCENARIOS: list[dict] = [
         "description": "Competitor undercuts heavily — tests Policy E (market pressure).",
         "expected_behavior": "OVERRIDE — must match lower competitor pricing or lose the deal.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="RTX4090",
             total_inventory=1000,
             available_inventory=600,
             active_spot_leases=30,
@@ -352,7 +352,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC13",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="RTX4090",
             quantity=4,
             duration_hours=24,
             workload_type="On-Demand",
@@ -365,7 +365,7 @@ SCENARIOS: list[dict] = [
         "description": "Spot request during inventory scarcity — tests Policy A + B clash.",
         "expected_behavior": "REJECT or low OVERRIDE — spot during scarcity is risky.",
         "gpu_state": GPUState(
-            gpu_type="H100",
+            gpu_type="B200",
             total_inventory=1000,
             available_inventory=30,
             active_spot_leases=100,
@@ -378,7 +378,7 @@ SCENARIOS: list[dict] = [
         "request": LeaseRequest(
             request_id="REQ-SC14",
             region="us-east-1",
-            gpu_type="H100",
+            gpu_type="B200",
             quantity=2,
             duration_hours=1,
             workload_type="Spot",

@@ -92,8 +92,8 @@ class ChaosMonkeySimulator:
             active_spot = int(total_inv * 0.2) if available < int(total_inv * 0.1) else int(total_inv * 0.05)
         
         # Simulate Live Market
-        gpu = self.environment_settings["gpu_type"]
-        if gpu == "H100":
+        gpu = random.choice(["B200", "H200", "H100", "A100", "L40S", "V100", "RTX4090", "T4"])
+        if gpu == "H100" or gpu == "H200" or gpu == "B200":
             base_market = random.uniform(2.50, 4.00)
         elif gpu == "A100":
             base_market = random.uniform(1.20, 2.00)
