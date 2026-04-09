@@ -115,6 +115,7 @@ const ThoughtCard = ({ item }) => {
 const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onExecuteCounterOffer, onViewComparison, hasComparison }) => {
     const endRef = useRef(null);
     const [replayOpen, setReplayOpen] = useState(false);
+    const [customBidPrice, setCustomBidPrice] = useState('');
     const [replayPolicies, setReplayPolicies] = useState({
         min_margin: '15%',
         scarcity_threshold: '10',
@@ -309,25 +310,97 @@ const AgentSidebar = ({ streamData, isThinking, lastDealContext, onReplay, onExe
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                     </svg>
-                                    Counter-Offer Pending
+                                    Interactive Counter-Offer Menu
                                 </h3>
-                                <div className="text-sm text-slate-300 mb-4">
-                                    The Bidding Agent has proposed a counter-offer for this rejected deal. Do you want to accept the new price and re-run?
+                                <div className="text-sm text-slate-300 mb-4 leading-relaxed">
+                                    The Deal Desk rejected the original bid. Choose how you'd like to proceed with the Counter Bid.
                                 </div>
-                                <div className="flex gap-3 mt-2">
-                                    <button 
-                                        onClick={() => {
-                                            const match = biddingThought.thought.content.match(/\[COUNTER_OFFER:\s*\$?([\d.]+)\]/);
-                                            const newPrice = match ? parseFloat(match[1]) : null;
-                                            if (onExecuteCounterOffer && newPrice) {
-                                                onExecuteCounterOffer(newPrice);
-                                            }
-                                        }}
-                                        className="flex-1 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-white font-bold text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(234,179,8,0.3)]"
-                                    >
-                                        Approve &amp; Re-Run
-                                    </button>
-                                </div>
+                                {(() => {
+                                    const match = biddingThought.thought.content.match(/\[COUNTER_OFFER:\s*\$?([\d.]+)\]/);
+                                    const recommendedPrice = match ? parseFloat(match[1]) : null;
+                                    
+                                    // Generate Alternative GPU prices based on theoretical post-ROI discounts (arbitrary mathematical approximations for UI demo)
+                                    const altV100Price = recommendedPrice ? (recommendedPrice * 0.45).toFixed(2) : '0.95';
+                                    const altA100Price = recommendedPrice ? (recommendedPrice * 0.75).toFixed(2) : '1.45';
+
+                                    return (
+                                        <div className="flex flex-col gap-4 border-l-2 border-yellow-500/30 pl-4 py-1">
+                                            {/* Primary Recommendation */}
+                                            <div className="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5 hover:border-yellow-500/30 transition-all">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Agent Strategy</p>
+                                                    <p className="text-sm font-bold text-yellow-400">Match base quote at <span className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded ml-1">${recommendedPrice?.toFixed(2)}/hr</span></p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => recommendedPrice && onExecuteCounterOffer(recommendedPrice)}
+                                                    disabled={!recommendedPrice}
+                                                    className="px-4 py-2 rounded border border-yellow-500/50 text-yellow-400 hover:bg-yellow-500 hover:text-white font-bold text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+                                                >
+                                                    Approve
+                                                </button>
+                                            </div>
+
+                                            {/* Alternative GPUs (Post-ROI Pivot) */}
+                                            <div className="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5 hover:border-blue-500/30 transition-all gap-4">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-0.5 flex items-center gap-1.5">
+                                                        Pivot: V100 Compute
+                                                    </p>
+                                                    <p className="text-sm font-bold text-slate-300">Offer fully amortized <span className="font-mono text-blue-400">V100</span> at <span className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded ml-1">${altV100Price}/hr</span></p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => onExecuteCounterOffer(parseFloat(altV100Price), 'V100')}
+                                                    className="px-4 py-2 rounded bg-blue-500/20 border border-blue-500/50 text-blue-400 hover:bg-blue-500 hover:text-white font-bold text-xs uppercase tracking-wider transition-colors whitespace-nowrap"
+                                                >
+                                                    Pitch V100
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5 hover:border-blue-500/30 transition-all gap-4">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Pivot: A100 Compute</p>
+                                                    <p className="text-sm font-bold text-slate-300">Offer older generation <span className="font-mono text-blue-400">A100</span> at <span className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded ml-1">${altA100Price}/hr</span></p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => onExecuteCounterOffer(parseFloat(altA100Price), 'A100')}
+                                                    className="px-4 py-2 rounded bg-blue-500/20 border border-blue-500/50 text-blue-400 hover:bg-blue-500 hover:text-white font-bold text-xs uppercase tracking-wider transition-colors whitespace-nowrap"
+                                                >
+                                                    Pitch A100
+                                                </button>
+                                            </div>
+
+                                            {/* Custom Input */}
+                                            <div className="flex flex-col gap-2 bg-black/40 p-3 rounded-lg border border-white/5 mt-1">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manual Counter</p>
+                                                <div className="flex gap-2 w-full">
+                                                    <div className="relative flex-1">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono">$</span>
+                                                        <input 
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={customBidPrice}
+                                                            onChange={(e) => setCustomBidPrice(e.target.value)}
+                                                            placeholder="Custom Price"
+                                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-7 pr-3 text-sm text-white font-mono focus:outline-none focus:border-yellow-500/50"
+                                                        />
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const val = parseFloat(customBidPrice);
+                                                            if (!isNaN(val) && val > 0) {
+                                                                onExecuteCounterOffer(val);
+                                                            }
+                                                        }}
+                                                        disabled={!customBidPrice || isNaN(parseFloat(customBidPrice))}
+                                                        className="px-4 py-2 rounded bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white font-bold text-xs uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                                    >
+                                                        Submit Custom
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
 

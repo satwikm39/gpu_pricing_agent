@@ -139,6 +139,7 @@ const PolicyControls = () => {
                                 onChange={handleChange}
                                 className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-500"
                             />
+                            <p className="text-xs text-slate-500 mt-2">Inventory level indicating high scarcity, enabling aggressive multipliers.</p>
                         </div>
 
                         <div>
@@ -215,6 +216,37 @@ const PolicyControls = () => {
                         >
                             {saving ? 'Syncing...' : saved ? '✓ Policy Live!' : 'Deploy New Policies'}
                         </button>
+                    </div>
+                </div>
+                
+                {/* Policy Framework / Handbook */}
+                <div className="flex-1">
+                    <div className="glass-panel p-6 flex flex-col gap-5 h-full">
+                        <h3 className="text-xl font-display font-bold text-white mb-2 flex items-center gap-3">
+                            <div className="bg-slate-800 p-2 rounded-xl border border-slate-600">
+                                <svg className="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                            </div>
+                            Policy Handbook
+                        </h3>
+                        <div className="flex flex-col gap-3">
+                            {[
+                                { name: 'Policy A', title: 'Margin Floor', color: 'text-violet-400', bg: 'bg-violet-500/10', desc: 'Sets a hard lower limit below which no automatic deal can be signed, protecting baseline profitability.' },
+                                { name: 'Policy B', title: 'Scarcity Surge', color: 'text-yellow-400', bg: 'bg-yellow-500/10', desc: 'Allows the agent to aggressively mark up prices as available hardware becomes severely constrained.' },
+                                { name: 'Policy C', title: 'Strategic Preemption', color: 'text-purple-400', bg: 'bg-purple-500/10', desc: 'Permits executing forced evictions of active low-paying Spot users to make room for high-paying On-Demand clients if the math is favorable.' },
+                                { name: 'Policy D', title: 'Lifecycle Aggression', color: 'text-blue-400', bg: 'bg-blue-500/10', desc: 'Unlocks deeper, aggressive spot discounts specifically for older hardware models that have fully amortized their CapEx.' },
+                                { name: 'Policy E', title: 'Market Cap', color: 'text-pink-400', bg: 'bg-pink-500/10', desc: 'Limits aggressive surging by imposing a functional ceiling tied directly to what Competitors are charging.' },
+                            ].map((pol, i) => (
+                                <div key={i} className="p-3 rounded-lg border border-slate-700/50 bg-slate-900/50 hover:bg-slate-800 transition-colors">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="font-mono text-[10px] text-slate-500 font-bold uppercase tracking-wider">{pol.name}</span>
+                                        <span className={`text-[11px] font-bold ${pol.color} ${pol.bg} px-1.5 py-0.5 rounded`}>{pol.title}</span>
+                                    </div>
+                                    <p className="text-slate-400 text-xs leading-relaxed">{pol.desc}</p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

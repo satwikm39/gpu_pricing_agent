@@ -380,16 +380,24 @@ function App() {
     });
   }, [lastDealContext, loading, isThinking]);
 
-  const handleExecuteCounterOffer = useCallback(async (newPrice) => {
+  const handleExecuteCounterOffer = useCallback(async (newPrice, gpuModel = null) => {
     if (!lastDealContext || loading || isThinking) return;
 
     const modifiedRequest = { ...lastDealContext.request, bid_price_per_hour: parseFloat(newPrice) };
+    const modifiedState = { ...lastDealContext.state };
+
+    if (gpuModel) {
+        modifiedRequest.gpu_type = gpuModel;
+        modifiedState.gpu_type = gpuModel;
+        modifiedState.cost_recovered = true; // Assume older alternate GPUs are post-ROI for the sake of the pivot logic
+    }
+    
     isSyncingRef.current = true;
 
     await processStream(`/api/tick/execute?group_id=${GROUP_ID}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request: modifiedRequest, state: lastDealContext.state })
+        body: JSON.stringify({ request: modifiedRequest, state: modifiedState })
     }, (data) => {
         setAgentStreamData(prev => [...prev, data]);
         
