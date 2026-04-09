@@ -42,20 +42,23 @@ const ChatbotPlayground = ({ lastDealContext, chatMessages, setChatMessages }) =
             if (res.ok) {
                 const data = await res.json();
                 
-                // Construct a rich response text.
-                let botMsgContent = `**Decision:** ${data.decision.action} at $${data.decision.final_price_per_hour.toFixed(2)}/hr\n\n`;
-                botMsgContent += `**Reasoning:**\n${data.decision.explanation}\n\n`;
+                let botMsgContent = data.response;
                 
-                // You can also append details of parameters extracted
-                const overrides = data.extracted_params;
-                const polOverrides = Object.entries(overrides.policy_overrides).filter(([k,v]) => v !== null);
-                const reqOverrides = Object.entries(overrides.request_overrides).filter(([k,v]) => v !== null);
-                
-                if (polOverrides.length > 0 || reqOverrides.length > 0) {
-                    botMsgContent += `_Extracted Parameters Used:_\n`;
-                    [...polOverrides, ...reqOverrides].forEach(([k, v]) => {
-                        botMsgContent += `- ${k}: ${v}\n`;
-                    });
+                if (!botMsgContent) {
+                    // Fallback to old behavior if response text doesn't exist
+                    botMsgContent = `**Decision:** ${data.decision.action} at $${data.decision.final_price_per_hour.toFixed(2)}/hr\n\n`;
+                    botMsgContent += `**Reasoning:**\n${data.decision.explanation}\n\n`;
+                    
+                    const overrides = data.extracted_params;
+                    const polOverrides = Object.entries(overrides.policy_overrides).filter(([k,v]) => v !== null);
+                    const reqOverrides = Object.entries(overrides.request_overrides).filter(([k,v]) => v !== null);
+                    
+                    if (polOverrides.length > 0 || reqOverrides.length > 0) {
+                        botMsgContent += `_Extracted Parameters Used:_\n`;
+                        [...polOverrides, ...reqOverrides].forEach(([k, v]) => {
+                            botMsgContent += `- ${k}: ${v}\n`;
+                        });
+                    }
                 }
 
                 setChatMessages(prev => [...prev, { role: 'assistant', content: botMsgContent }]);
@@ -71,35 +74,50 @@ const ChatbotPlayground = ({ lastDealContext, chatMessages, setChatMessages }) =
     };
 
     const renderMarkdownText = (text) => {
-        // A very basic markdown to JSX parser for bold and newline
-        return text.split('\n').map((line, i) => {
-            if (line.startsWith('- ')) {
-                // handle bullet
-                const content = line.substring(2);
-                const parts = content.split(/(\*\*.*?\*\*|_.*?_)/g);
+        const lines = text.split('\n');
+        return lines.map((line, i) => {
+            // Handle Headers
+            if (line.startsWith('### ')) {
+                return <h4 key={i} className="text-white font-bold text-sm mt-4 mb-2 uppercase tracking-wider border-b border-white/5 pb-1">{renderInline(line.substring(4))}</h4>;
+            }
+            if (line.startsWith('## ')) {
+                return <h3 key={i} className="text-white font-bold text-base mt-5 mb-2 border-b border-primary-500/30 pb-1">{renderInline(line.substring(3))}</h3>;
+            }
+
+            // Handle Bullets
+            if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+                const content = line.trim().substring(2);
                 return (
-                    <li key={i} className="ml-4 list-disc marker:text-primary-500">
-                        {parts.map((part, j) => {
-                            if (part.startsWith('**')) return <strong key={j} className="text-white font-bold">{part.replace(/\*\*/g, '')}</strong>;
-                            if (part.startsWith('_')) return <em key={j} className="text-primary-300 not-italic font-semibold">{part.replace(/_/g, '')}</em>;
-                            return <span key={j}>{part}</span>;
-                        })}
+                    <li key={i} className="ml-4 list-disc marker:text-primary-500 my-1">
+                        {renderInline(content)}
                     </li>
                 );
             }
+
+            // Handle Regular Paragraphs
+            if (line.trim() === '') return <div key={i} className="h-2" />;
             
-            const parts = line.split(/(\*\*.*?\*\*|_.*?_)/g);
             return (
-                <p key={i} className={i !== 0 ? "mt-2" : ""}>
-                    {parts.map((part, j) => {
-                        if (part.startsWith('**')) return <strong key={j} className="text-white font-bold">{part.replace(/\*\*/g, '')}</strong>;
-                        if (part.startsWith('_')) return <em key={j} className="text-primary-300 not-italic font-semibold">{part.replace(/_/g, '')}</em>;
-                        return <span key={j}>{part}</span>;
-                    })}
+                <p key={i} className="mt-1.5 first:mt-0 text-slate-300">
+                    {renderInline(line)}
                 </p>
             );
         });
-    }
+    };
+
+    const renderInline = (content) => {
+        // Simple inline parser for **bold** and _italic_
+        const parts = content.split(/(\*\*.*?\*\*|\*.*?\*|_.*?_)/g);
+        return parts.map((part, j) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                return <strong key={j} className="text-white font-extrabold">{part.slice(2, -2)}</strong>;
+            }
+            if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
+                return <em key={j} className="text-primary-300 not-italic font-semibold">{part.slice(1, -1)}</em>;
+            }
+            return <span key={j}>{part}</span>;
+        });
+    };
 
     return (
         <div className="glass-panel p-4 h-full flex flex-col relative overflow-hidden group border-primary-500/30 min-h-[380px]">

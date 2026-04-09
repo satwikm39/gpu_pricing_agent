@@ -305,10 +305,33 @@ async def process_chat(payload: ChatbotRequest, group_id: str = Query(default="d
     agent = PolicyAgent()
     decision = await agent.evaluate_quote(base_request, quote, base_state, base_policies)
     
+    try:
+        response_text = await extractor.generate_response(
+            query=payload.query,
+            history=[h.model_dump() for h in payload.history],
+            state=base_state.model_dump(),
+            policies=base_policies,
+            request=base_request.model_dump(),
+            quote=quote.model_dump(),
+            decision=decision.model_dump(),
+            extraction=extraction,
+            metrics={
+                "total_revenue": sim.total_revenue,
+                "trust_score": sim.trust_score,
+                "evictions": sim.evictions,
+                "rejected_deals": sim.rejected_deals,
+                "hardware_cost": sim.hardware_cost
+            }
+        )
+    except Exception as e:
+        response_text = "I encountered an error generating the response."
+        print(f"Error generating response: {e}")
+
     return {
         "decision": decision.model_dump(),
         "extracted_params": extraction.model_dump(),
-        "computed_quote": quote.model_dump()
+        "computed_quote": quote.model_dump(),
+        "response": response_text
     }
 
 # Legacy calculate endpoint removed since multi-agent handles raw data directly.

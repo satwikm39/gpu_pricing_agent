@@ -61,3 +61,71 @@ If they do not provide a value for a specific field, leave it null/None. Never i
                 policy_overrides=PolicyOverrides(),
                 request_overrides=RequestOverrides()
             )
+
+    async def generate_response(self, query: str, history: List[Dict[str, str]], state: Dict, policies: Dict, request: Dict, quote: Dict, decision: Dict, extraction: ChatbotExtraction, metrics: Dict = None) -> str:
+        formatted_history = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in history])
+        if not formatted_history:
+            formatted_history = "No previous history."
+
+        system_prompt = """You are an expert AI simulator assistant for a GPU Pricing Agent.
+Your role is to answer user questions about pricing policies, expected margins, eviction rates, and market dynamics.
+You are given the current GPU state, the current lease request, the applied policies, and the simulated decision outcome.
+
+GUIDELINES:
+1. **BE CONCISE**: Use 2-3 short paragraphs or bullet points maximum. Avoid long-winded policy definitions.
+2. **USE NUMBERS**: Always provide quantitative estimates and figures using the provided state and policies. If state data is missing, use reasonable industry estimates.
+3. **DO THE MATH**: If asked about margins, calculate them (e.g., "(Price $4.00 - Cost $1.50) / $4.00 = 62.5% margin").
+4. **FLUID MARKDOWN**: Use headers (###), bolding (**), and bullet points.
+5. **ACTIONABLE INSIGHTS**: Focus on the *impact* of policies on the bottom line, not just describing the policies.
+
+Current Context:
+- GPU Type: {state_gpu}
+- Costs: ${cost_total}/hr (${depr} depr + ${pwr} power)
+- Market Price: ${mkt}/hr
+- Active Policies: {policies_summary}
+- Cumulative Metrics: {metrics_summary}
+"""
+
+        # Pre-calculate context
+        state_gpu = state.get('gpu_type', 'Unknown')
+        depr = state.get('depreciation_cost_per_hour', 0)
+        pwr = state.get('power_opex_per_hour', 0)
+        cost_total = depr + pwr
+        mkt = state.get('market_price_per_hour', 0)
+        policies_summary = ", ".join([f"{k}: {v}" for k, v in policies.items()])
+        metrics_summary = ", ".join([f"{k}: {v}" for k, v in metrics.items()]) if metrics else "No metrics available yet."
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt.format(
+                state_gpu=state_gpu,
+                depr=depr,
+                pwr=pwr,
+                cost_total=f"{cost_total:.2f}",
+                mkt=mkt,
+                policies_summary=policies_summary,
+                metrics_summary=metrics_summary
+            )),
+            ("user", "Conversation History:\n{history}\n\nSimulated Context:\nRequest: {request}\nCalculated Quote: {quote}\nDecision Outcome: {decision}\n\nExtracted Overrides Applied:\n{overrides}\n\nUser Question: {query}")
+        ])
+
+        regular_llm = ChatOpenAI(
+            model="gpt-4o",
+            temperature=0.7,
+            api_key=self.llm.openai_api_key if hasattr(self.llm, 'openai_api_key') else None
+        )
+
+        try:
+            msg = await prompt.pipe(regular_llm).ainvoke({
+                "history": formatted_history,
+                "state": str(state),
+                "policies": str(policies),
+                "request": str(request),
+                "quote": str(quote),
+                "decision": str(decision),
+                "overrides": extraction.model_dump_json(exclude_none=True),
+                "query": query
+            })
+            return msg.content
+        except Exception as e:
+            logger.error(f"Chatbot response generation failed: {e}")
+            return "I run into an error while generating a response. Please try again."
