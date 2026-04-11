@@ -53,9 +53,9 @@ const TabButton = memo(({ tab, isActive, onClick, onKeyDown }) => (
     tabIndex={isActive ? 0 : -1}
     onClick={onClick}
     onKeyDown={onKeyDown}
-    className={`min-h-[44px] px-3 sm:px-5 py-2.5 flex-1 sm:flex-none rounded-lg text-sm font-semibold tracking-wide transition-colors flex items-center justify-center gap-2 ${
+    className={`min-h-[44px] px-3 sm:px-5 py-2.5 flex-1 sm:flex-none rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
       isActive
-        ? 'bg-slate-700 text-white shadow-sm'
+        ? 'bg-slate-700 text-white'
         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
     }`}
   >
@@ -503,21 +503,21 @@ function App() {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen p-3 sm:p-4 md:p-6 w-full flex flex-col gap-4 sm:gap-5 font-sans">
+    <div className="min-h-screen p-3 sm:p-4 md:p-6 w-full flex flex-col gap-5 sm:gap-6 font-sans">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0">
-        <div className="flex flex-col gap-1">
+        <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-display">
                 GPU Pricing Agent
             </h1>
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                <p className="text-slate-500 uppercase tracking-widest text-[10px] sm:text-xs font-medium">Autonomous Deal Desk</p>
+            <p className="text-slate-500 text-xs sm:text-sm mt-1">
+                Autonomous Deal Desk Simulation
                 {GROUP_ID !== 'default' && (
-                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-primary-600/15 text-primary-400 border border-primary-500/20">
+                    <span className="inline-flex items-center gap-1.5 ml-3 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-600/15 text-primary-400 border border-primary-500/20">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse" aria-hidden="true"></span>
                         {GROUP_ID}
                     </span>
                 )}
-            </div>
+            </p>
         </div>
         <button 
           onClick={async () => {
@@ -526,7 +526,7 @@ function App() {
               window.location.reload();
             }
           }}
-          className="min-h-[44px] px-4 py-2 text-[10px] uppercase tracking-widest font-bold text-red-400 hover:text-white border border-red-500/20 hover:bg-red-500/15 rounded-lg transition-colors"
+          className="min-h-[44px] px-4 py-2 text-xs text-red-400 hover:text-white border border-red-500/20 hover:bg-red-500/15 rounded-lg transition-colors"
         >
           Reset Simulation
         </button>
@@ -563,12 +563,12 @@ function App() {
           )}
 
           {activeTab === 'simulation' && (
-            <div className="flex flex-col gap-4 sm:gap-5 animate-fade-in w-full">
+            <div className="flex flex-col gap-5 sm:gap-6 animate-fade-in w-full">
                 <div className="panel p-3 sm:p-4 flex flex-wrap items-center gap-2 sm:gap-3">
                     <button 
                         onClick={runTickStream}
                         disabled={loading || isAutoRunning}
-                        className="min-h-[44px] px-4 py-2.5 sm:px-6 sm:py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+                        className="min-h-[44px] px-4 py-2.5 sm:px-6 sm:py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
                     >
                         {loading && !isAutoRunning ? (
                             <>
@@ -590,7 +590,7 @@ function App() {
                     <button 
                         onClick={() => setIsAutoRunning(!isAutoRunning)}
                         aria-pressed={isAutoRunning}
-                        className={`min-h-[44px] px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 ${isAutoRunning ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+                        className={`min-h-[44px] px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${isAutoRunning ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
                     >
                         {isAutoRunning ? (
                             <>
@@ -613,7 +613,7 @@ function App() {
                     <button 
                         onClick={saveCurrentRun}
                         disabled={feed.length === 0 || isAutoRunning}
-                        className="min-h-[44px] px-4 py-2.5 sm:px-4 sm:py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="min-h-[44px] px-4 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <svg className="w-5 h-5 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -622,32 +622,27 @@ function App() {
                     </button>
                 </div>
 
-                <div className="flex flex-col xl:flex-row gap-4 sm:gap-5 w-full items-start">
-                    <div className="flex-1 flex flex-col gap-4 sm:gap-5 w-full min-w-0">
+                <div className="flex flex-col xl:flex-row gap-5 sm:gap-6 w-full items-start">
+                    <div className="flex-1 flex flex-col gap-5 sm:gap-6 w-full min-w-0">
                         <div className="w-full shrink-0 h-[350px] sm:h-[400px]">
                             <ChatbotPlayground lastDealContext={lastDealContext} chatMessages={chatMessages} setChatMessages={setChatMessages} />
                         </div>
                         <div className="panel w-full flex-col flex flex-1 min-h-[400px] sm:min-h-[500px]">
                             <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-700/50 bg-slate-900/80 flex justify-between items-center z-10 sticky top-0">
                                 <h2 className="text-base sm:text-lg font-display font-bold text-white">Live Deal Feed</h2>
-                                <span className="text-slate-500 text-[10px] sm:text-xs font-semibold uppercase tracking-widest bg-slate-800/80 px-2 sm:px-3 py-1 rounded-full border border-slate-700/40">{feed.length} Decisions</span>
+                                <span className="text-slate-500 text-xs tabular-nums bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/40">{feed.length} decisions</span>
                             </div>
-                            <div className="p-3 sm:p-6 flex flex-col gap-4 sm:gap-6 min-h-[300px] sm:min-h-[400px]">
+                            <div className="p-3 sm:p-6 flex flex-col gap-5 sm:gap-8 min-h-[300px] sm:min-h-[400px]">
                                 {feed.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center text-center py-16 text-slate-500 gap-3">
-                                        <svg className="w-10 h-10 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                        </svg>
-                                        <p className="text-sm font-medium">No deals yet</p>
-                                        <p className="text-xs text-slate-600">Run a simulation tick to see decisions appear here</p>
+                                    <div className="flex flex-col items-center justify-center text-center py-16 text-slate-500 gap-2">
+                                        <p className="text-sm font-medium text-slate-400">No deals yet</p>
+                                        <p className="text-xs text-slate-600">Run a simulation tick to see decisions here</p>
                                     </div>
                                 ) : feed.map((tick, idx) => (
-                                    <div key={tick._serverId || idx} className="flex flex-col gap-4 sm:gap-6 w-full">
+                                    <div key={tick._serverId || idx} className="flex flex-col gap-5 sm:gap-8 w-full">
                                         <LiveFeed data={tick} />
                                         {idx < feed.length - 1 && (
-                                            <div className="flex items-center w-full px-4 sm:px-12 opacity-30 py-1" aria-hidden="true">
-                                                <div className="flex-1 h-px bg-slate-600"></div>
-                                                <div className="mx-4 w-1 h-1 rounded-full bg-slate-500"></div>
+                                            <div className="flex items-center w-full px-4 sm:px-12 opacity-20" aria-hidden="true">
                                                 <div className="flex-1 h-px bg-slate-600"></div>
                                             </div>
                                         )}
@@ -690,29 +685,29 @@ function App() {
       {ADMIN_KEY && adminData && (
         <div className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-[9999] max-w-[280px] sm:max-w-[320px] animate-slide-up">
           <div className="bg-slate-950 border border-amber-500/30 rounded-xl overflow-hidden shadow-lg">
-            <div className="bg-amber-500/5 border-b border-amber-500/20 px-4 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between">
-              <span className="text-amber-400 font-display font-bold text-[10px] uppercase tracking-[0.15em] flex items-center gap-2">
+            <div className="bg-amber-500/5 border-b border-amber-500/20 px-4 py-2.5 flex items-center justify-between">
+              <span className="text-amber-400 font-display font-bold text-xs flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true"></div>
-                 Debug Console
+                 Debug
               </span>
-              <span className="text-slate-500 text-[10px] font-mono">{GROUP_ID}</span>
+              <span className="text-slate-500 text-xs font-mono tabular-nums">{GROUP_ID}</span>
             </div>
-            <div className="p-4 sm:p-5 flex flex-col gap-3 sm:gap-4">
+            <div className="p-4 flex flex-col gap-3">
               <div>
-                 <label className="text-slate-500 text-[9px] font-bold uppercase tracking-wider mb-1 block">Scenario</label>
-                 <p className="text-white font-display font-bold text-sm leading-tight">
+                 <p className="text-slate-500 text-xs mb-0.5">Scenario</p>
+                 <p className="text-white font-display font-semibold text-sm leading-tight">
                    {adminData.scenario_name || (adminData.mode === 'random' ? 'Random Walk' : 'Loading...')}
                  </p>
               </div>
               <div>
-                 <label className="text-slate-500 text-[9px] font-bold uppercase tracking-wider mb-1 block">Expected</label>
+                 <p className="text-slate-500 text-xs mb-0.5">Expected</p>
                  <p className="text-amber-200/70 text-xs font-mono leading-relaxed">
                    {adminData.expected_behavior || adminData.message || "Awaiting next tick..."}
                  </p>
               </div>
               <div className="flex justify-between items-center bg-black/30 px-3 py-2 rounded-lg border border-slate-700/40">
-                 <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Tick</span>
-                 <span className="text-amber-400 font-mono font-bold text-xs">#{adminData.tick_counter}</span>
+                 <span className="text-slate-500 text-xs">Tick</span>
+                 <span className="text-amber-400 font-mono font-bold text-xs tabular-nums">#{adminData.tick_counter}</span>
               </div>
             </div>
           </div>

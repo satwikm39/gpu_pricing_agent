@@ -88,15 +88,10 @@ const PolicyComparisonModal = memo(({ isOpen, onClose, comparison }) => {
             >
                 <div className="sticky top-0 z-10 bg-slate-900/95 px-4 sm:px-6 md:px-8 py-4 sm:py-5 border-b border-slate-700/50 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <h2 id="comparison-title" className="text-white font-display font-bold text-base sm:text-lg flex items-center gap-2 sm:gap-3">
-                            <span className="bg-accent-500/10 p-1.5 sm:p-2 rounded-lg border border-accent-500/20 shrink-0">
-                                <svg className="w-4 sm:w-5 h-4 sm:h-5 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
-                            </span>
-                            <span className="truncate">Sensitivity Analysis</span>
+                        <h2 id="comparison-title" className="text-white font-display font-bold text-base sm:text-lg">
+                            Sensitivity Analysis
                         </h2>
-                        <p className="text-slate-500 text-xs sm:text-sm mt-1 ml-9 sm:ml-12">
+                        <p className="text-slate-500 text-xs sm:text-sm mt-1">
                             Same deal · Same market · Different rules
                         </p>
                     </div>
@@ -111,11 +106,11 @@ const PolicyComparisonModal = memo(({ isOpen, onClose, comparison }) => {
                     </button>
                 </div>
 
-                <div className="p-4 sm:p-6 md:p-8 flex flex-col gap-4 sm:gap-6">
+                <div className="p-4 sm:p-6 md:p-8 flex flex-col gap-5 sm:gap-8">
                     {comparison.dealRequest && (
-                        <div className="bg-slate-800/40 border border-slate-700/40 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm font-mono">
-                            <span className="text-slate-500 uppercase text-[10px] font-bold tracking-widest self-center">Deal:</span>
-                            <span className="text-slate-200 font-bold">{comparison.dealRequest.quantity}x {comparison.dealRequest.gpu_type}</span>
+                        <div className="bg-slate-800/40 border border-slate-700/40 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 flex flex-wrap gap-2 sm:gap-3 text-sm font-mono tabular-nums">
+                            <span className="text-slate-500 text-xs self-center">Deal:</span>
+                            <span className="text-slate-200 font-medium">{comparison.dealRequest.quantity}x {comparison.dealRequest.gpu_type}</span>
                             <span className="text-slate-600 hidden sm:inline">·</span>
                             <span className="text-slate-300">{comparison.dealRequest.duration_hours}h</span>
                             <span className="text-slate-600 hidden sm:inline">·</span>
@@ -131,7 +126,7 @@ const PolicyComparisonModal = memo(({ isOpen, onClose, comparison }) => {
 
                     <div className={`rounded-lg p-4 sm:p-5 border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 ${actionChanged ? 'bg-accent-900/10 border-accent-500/20' : 'bg-slate-800/30 border-slate-700/40'}`}>
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Decision Delta</span>
+                            <span className="text-xs text-slate-500">Decision Delta</span>
                             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                                 <ActionBadge action={original.action} />
                                 <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -139,20 +134,20 @@ const PolicyComparisonModal = memo(({ isOpen, onClose, comparison }) => {
                                 </svg>
                                 <ActionBadge action={replay.action} />
                                 {actionChanged && (
-                                    <span className="text-[10px] font-bold text-accent-300 bg-accent-500/10 px-2 py-1 rounded border border-accent-500/20">
-                                        FLIPPED
+                                    <span className="text-xs font-medium text-accent-300 bg-accent-500/10 px-2 py-1 rounded border border-accent-500/20">
+                                        Flipped
                                     </span>
                                 )}
                             </div>
                         </div>
                         <div className="flex flex-col gap-1.5 sm:text-right">
-                            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Price Delta</span>
-                            <div className="flex items-center gap-2 sm:justify-end flex-wrap">
+                            <span className="text-xs text-slate-500">Price Delta</span>
+                            <div className="flex items-center gap-2 sm:justify-end flex-wrap tabular-nums">
                                 <span className="font-mono text-slate-400 text-sm">${original.finalPrice.toFixed(2)}</span>
                                 <span className="text-slate-600" aria-hidden="true">→</span>
                                 <span className="font-mono text-white font-bold text-base sm:text-lg">${replay.finalPrice.toFixed(2)}</span>
                                 {!priceUnchanged && (
-                                    <span className={`font-mono font-bold text-xs sm:text-sm px-2 py-0.5 rounded ${priceRose ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'}`}>
+                                    <span className={`font-mono font-medium text-xs px-2 py-0.5 rounded ${priceRose ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'}`}>
                                         {priceDeltaStr}/hr
                                     </span>
                                 )}
@@ -160,11 +155,11 @@ const PolicyComparisonModal = memo(({ isOpen, onClose, comparison }) => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8">
                         <div className="flex flex-col gap-3">
                             <div className="flex items-center gap-2 mb-1">
                                 <div className="w-2 h-2 rounded-full bg-primary-400" aria-hidden="true"></div>
-                                <h3 className="text-white font-display font-bold text-xs sm:text-sm uppercase tracking-wider">Original Run</h3>
+                                <h3 className="text-white font-display font-semibold text-sm">Original Run</h3>
                             </div>
                             {Object.entries(POLICY_LABELS).map(([key, meta]) => {
                                 const val = original.policies?.[key];
@@ -172,19 +167,19 @@ const PolicyComparisonModal = memo(({ isOpen, onClose, comparison }) => {
                                 const changed = normalizePolicy(val) !== normalizePolicy(replayVal);
                                 return (
                                     <div key={key} className={`p-2.5 sm:p-3 rounded-lg border transition-colors ${changed ? 'bg-primary-900/10 border-primary-500/15' : 'bg-slate-800/30 border-slate-700/30'}`}>
-                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">{meta.label}</p>
-                                        <p className="font-mono text-primary-300 font-bold text-sm">
+                                        <p className="text-xs text-slate-500 mb-1">{meta.label}</p>
+                                        <p className="font-mono text-primary-300 font-medium text-sm tabular-nums">
                                             {val !== undefined && val !== null ? `${val}${!val.toString().includes('%') && !val.toString().includes('$') && meta.unit ? meta.unit : ''}` : '—'}
                                         </p>
                                     </div>
                                 );
                             })}
                             <div className="p-3 sm:p-4 mt-2 bg-slate-800/40 rounded-lg border border-slate-700/40">
-                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2">Verdict</p>
+                                <p className="text-xs text-slate-500 mb-2">Verdict</p>
                                 <ActionBadge action={original.action} />
-                                <p className="font-mono font-bold text-white text-base sm:text-lg mt-2">${original.finalPrice.toFixed(2)}<span className="text-slate-500 text-sm font-normal">/hr</span></p>
+                                <p className="font-mono font-bold text-white text-base sm:text-lg mt-2 tabular-nums">${original.finalPrice.toFixed(2)}<span className="text-slate-500 text-sm font-normal">/hr</span></p>
                                 {original.explanation && (
-                                    <p className="text-slate-400 text-xs mt-2 leading-relaxed line-clamp-4">{original.explanation}</p>
+                                    <p className="text-slate-400 text-sm mt-2 leading-relaxed line-clamp-4">{original.explanation}</p>
                                 )}
                             </div>
                         </div>
@@ -192,7 +187,7 @@ const PolicyComparisonModal = memo(({ isOpen, onClose, comparison }) => {
                         <div className="flex flex-col gap-3">
                             <div className="flex items-center gap-2 mb-1">
                                 <div className="w-2 h-2 rounded-full bg-accent-400" aria-hidden="true"></div>
-                                <h3 className="text-white font-display font-bold text-xs sm:text-sm uppercase tracking-wider">Policy Replay</h3>
+                                <h3 className="text-white font-display font-semibold text-sm">Policy Replay</h3>
                             </div>
                             {Object.entries(POLICY_LABELS).map(([key, meta]) => {
                                 const val = replay.policies?.[key];
@@ -200,22 +195,22 @@ const PolicyComparisonModal = memo(({ isOpen, onClose, comparison }) => {
                                 const changed = normalizePolicy(val) !== normalizePolicy(origVal);
                                 return (
                                     <div key={key} className={`p-2.5 sm:p-3 rounded-lg border transition-colors ${changed ? 'bg-accent-900/10 border-accent-500/20' : 'bg-slate-800/30 border-slate-700/30'}`}>
-                                        <p className="text-[10px] uppercase tracking-widest font-bold mb-1 flex items-center gap-1.5">
+                                        <p className="text-xs mb-1 flex items-center gap-1.5">
                                             <span className={changed ? 'text-accent-400' : 'text-slate-500'}>{meta.label}</span>
-                                            {changed && <span className="text-[9px] text-accent-400 bg-accent-500/10 px-1.5 rounded font-bold">MODIFIED</span>}
+                                            {changed && <span className="text-xs text-accent-400 bg-accent-500/10 px-1.5 rounded">modified</span>}
                                         </p>
-                                        <p className={`font-mono font-bold text-sm ${changed ? 'text-accent-300' : 'text-primary-300'}`}>
+                                        <p className={`font-mono font-medium text-sm tabular-nums ${changed ? 'text-accent-300' : 'text-primary-300'}`}>
                                             {val !== undefined && val !== null ? `${val}${!val.toString().includes('%') && !val.toString().includes('$') && meta.unit ? meta.unit : ''}` : '—'}
                                         </p>
                                     </div>
                                 );
                             })}
                             <div className="p-3 sm:p-4 mt-2 bg-slate-800/40 rounded-lg border border-accent-500/15">
-                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2">Verdict</p>
+                                <p className="text-xs text-slate-500 mb-2">Verdict</p>
                                 <ActionBadge action={replay.action} />
-                                <p className="font-mono font-bold text-white text-base sm:text-lg mt-2">${replay.finalPrice.toFixed(2)}<span className="text-slate-500 text-sm font-normal">/hr</span></p>
+                                <p className="font-mono font-bold text-white text-base sm:text-lg mt-2 tabular-nums">${replay.finalPrice.toFixed(2)}<span className="text-slate-500 text-sm font-normal">/hr</span></p>
                                 {replay.explanation && (
-                                    <p className="text-slate-400 text-xs mt-2 leading-relaxed line-clamp-4">{replay.explanation}</p>
+                                    <p className="text-slate-400 text-sm mt-2 leading-relaxed line-clamp-4">{replay.explanation}</p>
                                 )}
                             </div>
                         </div>

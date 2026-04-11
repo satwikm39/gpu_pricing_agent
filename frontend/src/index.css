@@ -69,10 +69,17 @@ body {
   background-color: #0a0f1a;
   color: #d1d5db;
   -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+  line-height: 1.7;
 }
 
 h1, h2, h3, h4, .font-display {
   font-family: var(--font-display);
+  line-height: 1.25;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 input[type="range"] {

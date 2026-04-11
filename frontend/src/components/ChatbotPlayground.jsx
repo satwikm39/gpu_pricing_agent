@@ -76,7 +76,7 @@ const ChatbotPlayground = memo(({ lastDealContext, chatMessages, setChatMessages
         const lines = text.split('\n');
         return lines.map((line, i) => {
             if (line.startsWith('### ')) {
-                return <h4 key={i} className="text-white font-bold text-sm mt-4 mb-2 uppercase tracking-wider border-b border-slate-700/40 pb-1">{renderInline(line.substring(4))}</h4>;
+                return <h4 key={i} className="text-white font-semibold text-sm mt-4 mb-2 border-b border-slate-700/40 pb-1">{renderInline(line.substring(4))}</h4>;
             }
             if (line.startsWith('## ')) {
                 return <h3 key={i} className="text-white font-bold text-base mt-5 mb-2 border-b border-primary-500/20 pb-1">{renderInline(line.substring(3))}</h3>;
@@ -105,10 +105,10 @@ const ChatbotPlayground = memo(({ lastDealContext, chatMessages, setChatMessages
         const parts = content.split(/(\*\*.*?\*\*|\*.*?\*|_.*?_)/g);
         return parts.map((part, j) => {
             if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={j} className="text-white font-extrabold">{part.slice(2, -2)}</strong>;
+                return <strong key={j} className="text-white font-bold">{part.slice(2, -2)}</strong>;
             }
             if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
-                return <em key={j} className="text-primary-300 not-italic font-semibold">{part.slice(1, -1)}</em>;
+                return <em key={j} className="text-primary-300 not-italic font-medium">{part.slice(1, -1)}</em>;
             }
             return <span key={j}>{part}</span>;
         });
@@ -117,33 +117,29 @@ const ChatbotPlayground = memo(({ lastDealContext, chatMessages, setChatMessages
     return (
         <div className="panel p-3 sm:p-4 h-full flex flex-col relative overflow-hidden border-primary-500/15 min-h-[300px] sm:min-h-[380px]">
             <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10 border-b border-slate-700/40 pb-3">
-                <div className="bg-primary-500/10 p-2 rounded-lg border border-primary-500/20">
-                    <svg className="w-5 h-5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                    </svg>
-                </div>
+                <svg className="w-5 h-5 text-primary-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
                 <div>
                     <h3 className="text-base sm:text-lg font-display font-bold text-white leading-tight">Simulator Assistant</h3>
-                    <p className="text-[10px] sm:text-xs text-slate-500">Ask "what-if" questions based on the current context</p>
+                    <p className="text-xs text-slate-500">Ask "what-if" questions based on the current context</p>
                 </div>
             </div>
 
             <div ref={chatContainerRef} className="flex-1 overflow-y-auto mb-3 sm:mb-4 space-y-3 sm:space-y-4 pr-1 sm:pr-2 custom-scrollbar" role="log" aria-live="polite" aria-label="Chat messages">
                 {chatMessages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-4 sm:p-6 text-slate-500 space-y-3">
-                        <svg className="w-10 sm:w-12 h-10 sm:h-12 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        <p className="text-xs sm:text-sm">
+                    <div className="h-full flex flex-col items-center justify-center text-center p-4 sm:p-6 text-slate-500 gap-2">
+                        <p className="text-sm text-slate-400">
                             Ask me to modify the current scenario's policies or parameters.
-                            <br />
-                            <span className="italic text-slate-600">e.g., "What if min margin is 25%?"</span>
+                        </p>
+                        <p className="text-xs text-slate-600 italic">
+                            e.g., "What if min margin is 25%?"
                         </p>
                     </div>
                 ) : (
                     chatMessages.map((msg, idx) => (
                         <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[90%] sm:max-w-[85%] rounded-lg p-3 text-[13px] leading-relaxed ${
+                            <div className={`max-w-[90%] sm:max-w-[85%] rounded-lg p-3 text-sm leading-relaxed ${
                                 msg.role === 'user' 
                                 ? 'bg-primary-600/70 text-white rounded-br-sm border border-primary-500/30' 
                                 : 'bg-slate-800/60 text-slate-300 rounded-bl-sm border border-slate-700/40 overflow-hidden'
