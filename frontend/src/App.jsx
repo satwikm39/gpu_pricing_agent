@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense, memo } from 'react'
 import MetricCards from './components/MetricCards'
 import LiveFeed from './components/LiveFeed'
 import ROIMeter from './components/ROIMeter'
-import PolicyControls from './components/PolicyControls'
 import ChatbotPlayground from './components/ChatbotPlayground'
 import AgentSidebar from './components/AgentSidebar'
 import PolicyComparisonModal from './components/PolicyComparisonModal'
-import WarGamesPanel from './components/WarGamesPanel'
 
-// Read the group ID from the URL query param: ?group=team1
+const PolicyControls = lazy(() => import('./components/PolicyControls'))
+const WarGamesPanel = lazy(() => import('./components/WarGamesPanel'))
+
+const MAX_FEED_ITEMS = 50;
+
 function getGroupId() {
   const params = new URLSearchParams(window.location.search);
   return params.get('group') || 'default';
@@ -16,7 +18,6 @@ function getGroupId() {
 
 const GROUP_ID = getGroupId();
 
-// Read the admin secret key from the URL query param: ?admin=secret
 function getAdminKey() {
   const params = new URLSearchParams(window.location.search);
   return params.get('admin');
@@ -26,22 +27,45 @@ const ADMIN_KEY = getAdminKey();
 
 const TABS = [
   { id: 'policy', label: 'Policy Sandbox', icon: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
-  ), color: 'accent', activeClass: 'bg-accent-600 shadow-[0_4px_20px_rgba(139,92,246,0.4)]' },
+  ) },
   { id: 'simulation', label: 'Simulation', icon: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
     </svg>
-  ), color: 'primary', activeClass: 'bg-primary-600 shadow-[0_4px_20px_rgba(37,99,235,0.4)]' },
+  ) },
   { id: 'wargames', label: 'War Games', icon: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
     </svg>
-  ), color: 'amber', activeClass: 'bg-amber-600 shadow-[0_4px_20px_rgba(217,119,6,0.4)]' },
+  ) },
 ];
+
+const TabButton = memo(({ tab, isActive, onClick }) => (
+  <button
+    role="tab"
+    id={`tab-${tab.id}`}
+    aria-selected={isActive}
+    aria-controls={`tabpanel-${tab.id}`}
+    onClick={onClick}
+    className={`px-5 py-2.5 flex-1 md:flex-none rounded-lg text-sm font-semibold tracking-wide transition-colors flex items-center gap-2 ${
+      isActive
+        ? 'bg-slate-700 text-white shadow-sm'
+        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+    }`}
+  >
+    {tab.icon}
+    {tab.label}
+  </button>
+));
+TabButton.displayName = 'TabButton';
+
+const LazyFallback = () => (
+  <div className="flex items-center justify-center py-20 text-slate-500 text-sm">Loading...</div>
+);
 
 function App() {
   const [activeTab, setActiveTab] = useState('policy')
@@ -68,15 +92,12 @@ function App() {
   const lastSeenHistoryId = useRef(0);
   const isSyncingRef = useRef(false);
 
-  // Persistent Event Stream: Instead of polling, we open a single long-lived connection.
-  // The server "pushes" updates whenever a tick completes or metrics change.
   useEffect(() => {
       let isMounted = true;
       let controller = new AbortController();
 
       const listenForEvents = async () => {
           try {
-              // Standard fetch-based stream reader (same robust logic as tick stream)
               const response = await fetch(`/api/events?group_id=${GROUP_ID}`, {
                   signal: controller.signal
               });
@@ -100,26 +121,22 @@ function App() {
                           try {
                               const event = JSON.parse(trimmed.slice(6));
                                 if (event.type === 'initial') {
-                                    // Someone else started a tick. Switch to thinking mode unless we are the one who started it.
-                                    if (!isSyncingRef.current) { // isSyncingRef.current is a good proxy for "are we the initiator"
-                                        setAgentStreamData([]); // Reset for new session
+                                    if (!isSyncingRef.current) {
+                                        setAgentStreamData([]);
                                         setIsThinking(true);
                                         setLastDealContext({ request: event.request, state: event.state });
                                         setChatMessages([]);
                                     }
                                 } else if (event.type === 'thought') {
-                                    // Append thoughts if we didn't start the tick (to avoid duplicates)
                                     if (!isSyncingRef.current) {
                                         setAgentStreamData(prev => [...prev, event]);
                                     }
                                 } else if (event.type === 'tick_completed') {
                                     const t = event.tick;
                                     
-                                    // Update Metrics
                                     setMetrics(t.metrics);
                                     setIsThinking(false);
 
-                                    // Maintain robust metrics
                                     setLastDealContext({ request: t.request, state: t.state });
                                     originalDecisionRef.current = {
                                         action: t.decision.action,
@@ -128,17 +145,17 @@ function App() {
                                         policies: t.thoughts?.[0]?.thought?.policies || null
                                     };
 
-                                  // Update Feed (prepend if new)
                                   setFeed(prev => {
                                       if (prev.some(p => p._serverId === t.id)) return prev;
                                       lastSeenHistoryId.current = t.id;
-                                      return [{
+                                      const next = [{
                                           request: t.request,
                                           state: t.state,
                                           decision: t.decision,
                                           metrics: t.metrics,
                                           _serverId: t.id,
                                       }, ...prev];
+                                      return next.slice(0, MAX_FEED_ITEMS);
                                   });
 
                               }
@@ -156,7 +173,6 @@ function App() {
           }
       };
 
-      // Initial Rehydration: Fetch current state once on mount
       const rehydrate = async () => {
           try {
               const [metricsRes, historyRes, activeRes] = await Promise.all([
@@ -176,11 +192,10 @@ function App() {
                           metrics: t.metrics,
                           _serverId: t.id,
                           thoughts: t.thoughts || []
-                      })).reverse());
+                      })).reverse().slice(0, MAX_FEED_ITEMS));
                       
                       const lastTick = ticks[ticks.length - 1];
                       if (lastTick.thoughts && lastTick.thoughts.length > 0) {
-                          // Combine stored initial event with thoughts and final decision for consistent display
                           const displayThoughts = [
                               ...(lastTick.initial ? [lastTick.initial] : []),
                               ...lastTick.thoughts,
@@ -195,7 +210,6 @@ function App() {
                           setLastDealContext({ request: lastTick.request, state: lastTick.state });
                           setChatMessages([]);
                           
-                          // Policies for Re-run come from the initial event of THIS tick
                           const tickPolicies = lastTick.initial?.policies || lastTick.thoughts?.[0]?.thought?.policies || null;
                           
                           originalDecisionRef.current = {
@@ -208,7 +222,6 @@ function App() {
                   }
               }
 
-              // Check for an in-progress tick (Late Joiner Catch-up)
               if (activeRes.ok) {
                   const active = await activeRes.json();
                   if (active && active.initial) {
@@ -229,9 +242,8 @@ function App() {
           isMounted = false;
           controller.abort();
       };
-  }, []); // Only run once on mount! No more interval loops.
+  }, []);
 
-  // Poll admin debug data if key is present
   useEffect(() => {
     if (!ADMIN_KEY) return;
     
@@ -255,7 +267,6 @@ function App() {
 
   const [agentStreamData, setAgentStreamData] = useState([])
 
-  // Robust line-by-line SSE Processor
   const processStream = async (url, options = {}, onMessage) => {
     setLoading(true);
     setIsThinking(true);
@@ -275,9 +286,8 @@ function App() {
 
             buffer += decoder.decode(value, { stream: true });
             
-            // Look for individual data lines (standard SSE format)
             const lines = buffer.split('\n');
-            buffer = lines.pop(); // Keep partial line
+            buffer = lines.pop();
 
             for (const line of lines) {
                 const trimmed = line.trim();
@@ -294,7 +304,6 @@ function App() {
             }
         }
         
-        // Process any leftover buffer if the stream closes without a final newline
         if (buffer.trim().startsWith('data: ')) {
             try {
                 const data = JSON.parse(buffer.trim().slice(6));
@@ -315,7 +324,7 @@ function App() {
     setComparisonOpen(false);
     setComparisonData(null);
     originalDecisionRef.current = null;
-    isSyncingRef.current = true; // Mark that WE are the initiator
+    isSyncingRef.current = true;
 
     await processStream(`/api/tick/stream?group_id=${GROUP_ID}`, {}, (data) => {
         setAgentStreamData(prev => [...prev, data]);
@@ -327,7 +336,6 @@ function App() {
         
         if (data.type === 'final_decision') {
             setMetrics(data.metrics);
-            // We use the function form of setAgentStreamData, so we need to look back at the accumulated state for decision mapping
             setAgentStreamData(current => {
                  if (data.type === 'final_decision' && !data.is_replay) {
                     const initialEvent = current.find(d => d.type === 'initial');
@@ -389,7 +397,7 @@ function App() {
     if (gpuModel) {
         modifiedRequest.gpu_type = gpuModel;
         modifiedState.gpu_type = gpuModel;
-        modifiedState.cost_recovered = true; // Assume older alternate GPUs are post-ROI for the sake of the pivot logic
+        modifiedState.cost_recovered = true;
     }
     
     isSyncingRef.current = true;
@@ -418,7 +426,7 @@ function App() {
     if (loading || isThinking) return;
 
     isSyncingRef.current = true;
-    setActiveTab('simulation'); // Force switch tab
+    setActiveTab('simulation');
 
     await processStream(`/api/tick/execute?group_id=${GROUP_ID}`, {
         method: 'POST',
@@ -440,7 +448,6 @@ function App() {
     isSyncingRef.current = false;
   }, [loading, isThinking]);
 
-  // Handle auto-run interval
   useEffect(() => {
     let interval;
     if (isAutoRunning && activeTab === 'simulation' && !loading && !isThinking) {
@@ -470,18 +477,41 @@ function App() {
       }
   }
 
+  const handleTabKeyDown = useCallback((e) => {
+    const tabIds = TABS.map(t => t.id);
+    const currentIdx = tabIds.indexOf(activeTab);
+    let nextIdx = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextIdx = (currentIdx + 1) % tabIds.length;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      nextIdx = (currentIdx - 1 + tabIds.length) % tabIds.length;
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      nextIdx = 0;
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      nextIdx = tabIds.length - 1;
+    }
+    if (nextIdx >= 0) {
+      setActiveTab(tabIds[nextIdx]);
+      document.getElementById(`tab-${tabIds[nextIdx]}`)?.focus();
+    }
+  }, [activeTab]);
+
   return (
     <div className="min-h-screen p-4 md:p-6 lg:p-6 w-full flex flex-col gap-5 font-sans">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-0 shrink-0">
         <div className="flex flex-col">
-            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-primary-500 to-accent-400 tracking-tight font-display drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+            <h1 className="text-3xl font-bold text-white tracking-tight font-display">
                 GPU Pricing Agent
             </h1>
             <div className="flex items-center gap-3 mt-1">
-                <p className="text-slate-400 uppercase tracking-widest text-xs font-semibold">Autonomous Deal Desk Simulation</p>
+                <p className="text-slate-500 uppercase tracking-widest text-xs font-medium">Autonomous Deal Desk Simulation</p>
                 {GROUP_ID !== 'default' && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-600/20 text-primary-300 border border-primary-500/30">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse"></span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-600/15 text-primary-400 border border-primary-500/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse" aria-hidden="true"></span>
                         {GROUP_ID}
                     </span>
                 )}
@@ -492,7 +522,7 @@ function App() {
                       window.location.reload();
                     }
                   }}
-                  className="ml-auto px-3 py-1 text-[10px] uppercase tracking-widest font-bold text-red-400 hover:text-white border border-red-500/30 hover:bg-red-500/20 rounded transition-all duration-300"
+                  className="ml-auto px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold text-red-400 hover:text-white border border-red-500/20 hover:bg-red-500/15 rounded-lg transition-colors"
                 >
                   Reset Simulation
                 </button>
@@ -500,150 +530,159 @@ function App() {
         </div>
       </header>
 
-      <div className="flex bg-slate-800/40 p-1.5 rounded-xl w-full md:w-fit border border-white/5 backdrop-blur-md">
-        {TABS.map(tab => (
-          <button 
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-5 py-2.5 flex-1 md:flex-none rounded-lg text-sm font-bold tracking-wide transition-all flex items-center gap-2 ${activeTab === tab.id ? `${tab.activeClass} text-white` : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'policy' && <PolicyControls />}
-
-      {activeTab === 'simulation' && (
-        <div className="flex flex-col gap-5 animate-fade-in w-full">
-            <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
-                <button 
-                    onClick={runTickStream}
-                    disabled={loading || isAutoRunning}
-                    className="px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all duration-300 flex items-center gap-2"
-                >
-                    {loading && !isAutoRunning ? (
-                        <>
-                            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Simulating...
-                        </>
-                    ) : (
-                        <>
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                            Manual Tick
-                        </>
-                    )}
-                </button>
-                <button 
-                    onClick={() => setIsAutoRunning(!isAutoRunning)}
-                    className={`px-4 py-2 sm:px-6 sm:py-3 rounded-lg font-semibold transition-all duration-300 flex items-center gap-2 shadow-md ${isAutoRunning ? 'bg-red-500 hover:bg-red-400 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
-                >
-                    {isAutoRunning ? (
-                        <>
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Stop Auto
-                        </>
-                    ) : (
-                        <>
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Auto Run
-                        </>
-                    )}
-                </button>
-                <div className="w-px h-8 bg-slate-700 mx-1 self-center hidden sm:block"></div>
-                <button 
-                    onClick={saveCurrentRun}
-                    disabled={feed.length === 0 || isAutoRunning}
-                    className="px-4 py-2 sm:px-4 sm:py-3 rounded-lg font-semibold transition-all duration-300 flex items-center gap-2 border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                    </svg>
-                    Save Run
-                </button>
-            </div>
-
-            {/* Silenced Hardware ROI & Metrics Panel per request */}
-            {/*
-            <div className="glass-panel w-full p-5 glow-top">
-                <div className="flex flex-col lg:flex-row gap-5 items-center">
-                    <div className="w-full lg:w-1/3 shrink-0"><ROIMeter metrics={metrics} /></div>
-                    <div className="w-full lg:w-2/3"><MetricCards metrics={metrics} /></div>
-                </div>
-            </div>
-            */}
-
-            <div className="flex flex-col xl:flex-row gap-5 w-full items-start">
-                <div className="flex-1 flex flex-col gap-5 w-full">
-                    <div className="w-full shrink-0 h-[400px]">
-                        <ChatbotPlayground lastDealContext={lastDealContext} chatMessages={chatMessages} setChatMessages={setChatMessages} />
-                    </div>
-                    <div className="glass-panel w-full flex-col flex flex-1 mt-0 glow-top min-h-[500px]">
-                        <div className="px-6 py-4 border-b border-white/10 bg-slate-900/60 flex justify-between items-center z-10 sticky top-0">
-                            <h2 className="text-xl font-display font-bold flex items-center gap-3 text-white">Executive Live Deal Feed</h2>
-                            <span className="text-slate-400 text-sm font-semibold uppercase tracking-widest bg-slate-800/50 px-3 py-1 rounded-full border border-white/5">{feed.length} Decisions</span>
-                        </div>
-                        <div className="p-6 flex flex-col gap-6 min-h-[400px]">
-                            {feed.map((tick, idx) => (
-                                <div key={idx} className="flex flex-col gap-6 w-full">
-                                    <LiveFeed data={tick} />
-                                    {idx < feed.length - 1 && (
-                                        <div className="flex items-center w-full px-4 sm:px-12 opacity-50 py-1">
-                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-500 to-slate-500"></div>
-                                            <div className="mx-4 w-1.5 h-1.5 rounded-full bg-slate-500 shadow-[0_0_8px_rgba(100,116,139,0.8)]"></div>
-                                            <div className="flex-1 h-px bg-gradient-to-l from-transparent via-slate-500 to-slate-500"></div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="w-full xl:w-[420px] 2xl:w-[480px] shrink-0 h-[85vh] xl:sticky xl:top-6 z-30">
-                    <AgentSidebar 
-                        streamData={agentStreamData} 
-                        isThinking={isThinking}
-                        lastDealContext={lastDealContext}
-                        onReplay={handleReplay}
-                        onExecuteCounterOffer={handleExecuteCounterOffer}
-                        onViewComparison={() => setComparisonOpen(true)}
-                        hasComparison={!!comparisonData}
-                    />
-                </div>
-            </div>
+      <nav aria-label="Main navigation">
+        <div
+          role="tablist"
+          aria-label="Simulation views"
+          onKeyDown={handleTabKeyDown}
+          className="flex bg-slate-800/60 p-1 rounded-lg w-full md:w-fit border border-slate-700/40"
+        >
+          {TABS.map(tab => (
+            <TabButton
+              key={tab.id}
+              tab={tab}
+              isActive={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+            />
+          ))}
         </div>
-      )}
+      </nav>
 
-      {activeTab === 'wargames' && (
-        <WarGamesPanel
-            savedRuns={savedRuns}
-            onClearRuns={() => setSavedRuns([])}
-            onSaveRun={saveCurrentRun}
-            canSave={feed.length > 0 && !isAutoRunning}
-            isAutoRunning={isAutoRunning}
-            onRunScenario={handleRunScenario}
-        />
-      )}
+      <main id="main-content">
+        <div
+          role="tabpanel"
+          id={`tabpanel-${activeTab}`}
+          aria-labelledby={`tab-${activeTab}`}
+        >
+          {activeTab === 'policy' && (
+            <Suspense fallback={<LazyFallback />}>
+              <PolicyControls />
+            </Suspense>
+          )}
 
-      {/* ADMIN OVERLAY - Hidden unless ?admin=REDACTED is in URL */}
+          {activeTab === 'simulation' && (
+            <div className="flex flex-col gap-5 animate-fade-in w-full">
+                <div className="panel p-4 flex flex-wrap items-center gap-3">
+                    <button 
+                        onClick={runTickStream}
+                        disabled={loading || isAutoRunning}
+                        className="px-4 py-2.5 sm:px-6 sm:py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+                    >
+                        {loading && !isAutoRunning ? (
+                            <>
+                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Simulating...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Manual Tick
+                            </>
+                        )}
+                    </button>
+                    <button 
+                        onClick={() => setIsAutoRunning(!isAutoRunning)}
+                        aria-pressed={isAutoRunning}
+                        className={`px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 ${isAutoRunning ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+                    >
+                        {isAutoRunning ? (
+                            <>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Stop Auto
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Auto Run
+                            </>
+                        )}
+                    </button>
+                    <div className="w-px h-8 bg-slate-700 mx-1 self-center hidden sm:block" aria-hidden="true"></div>
+                    <button 
+                        onClick={saveCurrentRun}
+                        disabled={feed.length === 0 || isAutoRunning}
+                        className="px-4 py-2.5 sm:px-4 sm:py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg className="w-5 h-5 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        Save Run
+                    </button>
+                </div>
+
+                <div className="flex flex-col xl:flex-row gap-5 w-full items-start">
+                    <div className="flex-1 flex flex-col gap-5 w-full min-w-0">
+                        <div className="w-full shrink-0 h-[400px]">
+                            <ChatbotPlayground lastDealContext={lastDealContext} chatMessages={chatMessages} setChatMessages={setChatMessages} />
+                        </div>
+                        <div className="panel w-full flex-col flex flex-1 mt-0 min-h-[500px]">
+                            <div className="px-6 py-4 border-b border-slate-700/60 bg-slate-900/80 flex justify-between items-center z-10 sticky top-0">
+                                <h2 className="text-lg font-display font-bold text-white">Executive Live Deal Feed</h2>
+                                <span className="text-slate-500 text-xs font-semibold uppercase tracking-widest bg-slate-800/80 px-3 py-1 rounded-full border border-slate-700/40">{feed.length} Decisions</span>
+                            </div>
+                            <div className="p-6 flex flex-col gap-6 min-h-[400px]">
+                                {feed.map((tick, idx) => (
+                                    <div key={tick._serverId || idx} className="flex flex-col gap-6 w-full">
+                                        <LiveFeed data={tick} />
+                                        {idx < feed.length - 1 && (
+                                            <div className="flex items-center w-full px-4 sm:px-12 opacity-30 py-1" aria-hidden="true">
+                                                <div className="flex-1 h-px bg-slate-600"></div>
+                                                <div className="mx-4 w-1 h-1 rounded-full bg-slate-500"></div>
+                                                <div className="flex-1 h-px bg-slate-600"></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <aside className="w-full xl:w-[420px] 2xl:w-[480px] shrink-0 h-[85vh] xl:sticky xl:top-6 z-30" aria-label="Agent workflow">
+                        <AgentSidebar 
+                            streamData={agentStreamData} 
+                            isThinking={isThinking}
+                            lastDealContext={lastDealContext}
+                            onReplay={handleReplay}
+                            onExecuteCounterOffer={handleExecuteCounterOffer}
+                            onViewComparison={() => setComparisonOpen(true)}
+                            hasComparison={!!comparisonData}
+                        />
+                    </aside>
+                </div>
+            </div>
+          )}
+
+          {activeTab === 'wargames' && (
+            <Suspense fallback={<LazyFallback />}>
+              <WarGamesPanel
+                  savedRuns={savedRuns}
+                  onClearRuns={() => setSavedRuns([])}
+                  onSaveRun={saveCurrentRun}
+                  canSave={feed.length > 0 && !isAutoRunning}
+                  isAutoRunning={isAutoRunning}
+                  onRunScenario={handleRunScenario}
+              />
+            </Suspense>
+          )}
+        </div>
+      </main>
+
       {ADMIN_KEY && adminData && (
         <div className="fixed bottom-6 left-6 z-[9999] max-w-[320px] animate-slide-up">
-          <div className="bg-slate-950 border-2 border-amber-500/50 rounded-2xl shadow-[0_0_40px_rgba(245,158,11,0.2)] overflow-hidden">
-            <div className="bg-amber-500/10 border-b border-amber-500/30 px-5 py-3 flex items-center justify-between">
+          <div className="bg-slate-950 border border-amber-500/30 rounded-xl overflow-hidden shadow-lg">
+            <div className="bg-amber-500/5 border-b border-amber-500/20 px-5 py-3 flex items-center justify-between">
               <span className="text-amber-400 font-display font-bold text-[10px] uppercase tracking-[0.2em] flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,1)]"></div>
+                 <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true"></div>
                  Simulation Debugger
               </span>
               <span className="text-slate-500 text-[10px] font-mono">ID: {GROUP_ID}</span>
@@ -657,17 +696,17 @@ function App() {
               </div>
               <div>
                  <label className="text-slate-500 text-[9px] font-bold uppercase tracking-wider mb-1 block">Expected Behavior</label>
-                 <p className="text-amber-200/80 text-xs font-mono leading-relaxed">
+                 <p className="text-amber-200/70 text-xs font-mono leading-relaxed">
                    {adminData.expected_behavior || adminData.message || "Awaiting next tick..."}
                  </p>
               </div>
-              <div className="flex justify-between items-center bg-black/40 px-3 py-2 rounded-lg border border-white/5">
+              <div className="flex justify-between items-center bg-black/30 px-3 py-2 rounded-lg border border-slate-700/40">
                  <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Tick Counter</span>
                  <span className="text-amber-400 font-mono font-bold text-xs">#{adminData.tick_counter}</span>
               </div>
             </div>
           </div>
-          <div className="mt-3 px-4 py-1.5 bg-black/50 backdrop-blur-md rounded-full border border-white/5 text-[9px] text-slate-500 font-mono flex items-center justify-center gap-2 italic">
+          <div className="mt-3 px-4 py-1.5 bg-black/40 rounded-full border border-slate-700/30 text-[9px] text-slate-500 font-mono flex items-center justify-center gap-2 italic">
              Confidential Instructor Console
           </div>
         </div>
