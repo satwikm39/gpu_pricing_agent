@@ -115,34 +115,35 @@ const ChatbotPlayground = memo(({ lastDealContext, chatMessages, setChatMessages
     };
 
     return (
-        <div className="panel p-4 h-full flex flex-col relative overflow-hidden border-primary-500/15 min-h-[380px]">
-            <div className="flex items-center gap-3 mb-4 relative z-10 border-b border-slate-700/40 pb-3">
+        <div className="panel p-3 sm:p-4 h-full flex flex-col relative overflow-hidden border-primary-500/15 min-h-[300px] sm:min-h-[380px]">
+            <div className="flex items-center gap-3 mb-3 sm:mb-4 relative z-10 border-b border-slate-700/40 pb-3">
                 <div className="bg-primary-500/10 p-2 rounded-lg border border-primary-500/20">
                     <svg className="w-5 h-5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                     </svg>
                 </div>
                 <div>
-                    <h3 className="text-lg font-display font-bold text-white leading-tight">Simulator Assistant</h3>
-                    <p className="text-xs text-slate-500">Ask "What-if" questions based on the current context</p>
+                    <h3 className="text-base sm:text-lg font-display font-bold text-white leading-tight">Simulator Assistant</h3>
+                    <p className="text-[10px] sm:text-xs text-slate-500">Ask "what-if" questions based on the current context</p>
                 </div>
             </div>
 
-            <div ref={chatContainerRef} className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent" role="log" aria-live="polite" aria-label="Chat messages">
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto mb-3 sm:mb-4 space-y-3 sm:space-y-4 pr-1 sm:pr-2 custom-scrollbar" role="log" aria-live="polite" aria-label="Chat messages">
                 {chatMessages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-3">
-                        <svg className="w-12 h-12 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <div className="h-full flex flex-col items-center justify-center text-center p-4 sm:p-6 text-slate-500 space-y-3">
+                        <svg className="w-10 sm:w-12 h-10 sm:h-12 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        <p className="text-sm">
-                            Ask me to modify the current scenario's policies or parameters.<br/>
-                            <span className="italic text-slate-600">e.g., "What if min margin is 25% and request is Spot?"</span>
+                        <p className="text-xs sm:text-sm">
+                            Ask me to modify the current scenario's policies or parameters.
+                            <br />
+                            <span className="italic text-slate-600">e.g., "What if min margin is 25%?"</span>
                         </p>
                     </div>
                 ) : (
                     chatMessages.map((msg, idx) => (
                         <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[95%] rounded-lg p-3 text-[13px] leading-relaxed ${
+                            <div className={`max-w-[90%] sm:max-w-[85%] rounded-lg p-3 text-[13px] leading-relaxed ${
                                 msg.role === 'user' 
                                 ? 'bg-primary-600/70 text-white rounded-br-sm border border-primary-500/30' 
                                 : 'bg-slate-800/60 text-slate-300 rounded-bl-sm border border-slate-700/40 overflow-hidden'
@@ -176,15 +177,15 @@ const ChatbotPlayground = memo(({ lastDealContext, chatMessages, setChatMessages
                     type="text" 
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="E.g., What if the hardware was an A100?"
+                    placeholder="e.g., What if the hardware was an A100?"
                     disabled={loading}
-                    className="w-full bg-slate-800/50 text-white text-sm rounded-lg pl-3 pr-10 py-2.5 border border-slate-600 focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-colors placeholder-slate-600 disabled:opacity-50"
+                    className="w-full min-h-[44px] bg-slate-800/50 text-white text-sm rounded-lg pl-3 pr-12 py-2.5 border border-slate-600 focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-colors placeholder-slate-600 disabled:opacity-50"
                 />
                 <button 
                     type="submit"
                     disabled={!input.trim() || loading}
                     aria-label="Send message"
-                    className="absolute right-1.5 top-[16px] p-1.5 text-primary-400 hover:text-white hover:bg-primary-500/15 rounded-md transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 mt-[6px] min-w-[36px] min-h-[36px] flex items-center justify-center text-primary-400 hover:text-white hover:bg-primary-500/15 rounded-md transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
                 >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
