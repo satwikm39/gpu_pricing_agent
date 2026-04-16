@@ -1,7 +1,7 @@
 import React, { useRef, useState, memo, useMemo } from 'react';
 
 const AGENT_SEQUENCE = [
-    { node: 'pricing', name: 'Pricing Base Agent', icon: '💰' },
+    { node: 'pricing', name: 'Base Price Agent', icon: '💰' },
     { node: 'negative', name: 'Conservative Risk Agent', icon: '🛡️' },
     { node: 'positive', name: 'Opportunistic Growth Agent', icon: '🚀' },
     { node: 'market', name: 'Market Monitor Agent', icon: '📈' },
