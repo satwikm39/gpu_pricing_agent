@@ -15,17 +15,27 @@ const POLICY_SEQUENCE = [
     { node: 'critique', name: 'Policy Critique Agent', icon: '📝' }
 ];
 
+const renderFormattedText = (text) => {
+    if (!text) return text;
+    return text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i} className="font-semibold text-slate-200">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+    });
+};
+
 const ThoughtCard = memo(({ item }) => {
     const [expanded, setExpanded] = useState(false);
     const isJudge = item.node === 'judge';
     const isPolicy = ['analyst', 'critique'].includes(item.node);
-    
+
     const iconObj = AGENT_SEQUENCE.find(a => a.node === item.node) || POLICY_SEQUENCE.find(a => a.node === item.node);
     const icon = iconObj?.icon || '🤖';
-    
-    const sentences = item.thought.content.split(/(?<=[.!?])\s+/);
-    const summary = sentences[0];
-    const rest = sentences.slice(1).join(' ');
+
+    const match = item.thought.content.match(/(.*?[.!?])(?:\s+)(.*)/s);
+    const summary = match ? match[1] : item.thought.content;
+    const rest = match ? match[2] : '';
 
     const suggestions = [...item.thought.content.matchAll(/\[SUGGESTION:\s*([^\]]+)\]/g)].map(m => m[1]);
     const capacityMatch = item.thought.content.match(/\[CAPACITY_ACTION:\s*([^\]]+)\]/);
@@ -47,7 +57,7 @@ const ThoughtCard = memo(({ item }) => {
     return (
         <div className={`p-3 sm:p-4 animate-slide-up w-full ${styleClass}`}>
             <h3 className={`font-display font-semibold text-xs tracking-wide mb-2 sm:mb-3 flex items-center gap-2 ${textClass}`}>
-                <span className="text-base" aria-hidden="true">{icon}</span> 
+                <span className="text-base" aria-hidden="true">{icon}</span>
                 <span className="truncate">{item.thought.agent_name}</span>
             </h3>
             <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-sans break-words">
@@ -92,11 +102,11 @@ const ThoughtCard = memo(({ item }) => {
                     <div className="mt-3">
                         {expanded && (
                             <div className="mt-3 text-slate-400 border-t border-slate-700/40 pt-3 animate-fade-in text-sm leading-relaxed break-words">
-                                {rest.replace(/\[(SUGGESTION|CAPACITY_ACTION):[^\]]+\]/g, '').trim()}
+                                {renderFormattedText(rest.replace(/\[(SUGGESTION|CAPACITY_ACTION):[^\]]+\]/g, '').trim())}
                             </div>
                         )}
-                        <button 
-                            onClick={() => setExpanded(!expanded)} 
+                        <button
+                            onClick={() => setExpanded(!expanded)}
                             aria-expanded={expanded}
                             className="min-h-[36px] text-xs text-primary-400 mt-2 hover:text-primary-300 transition-colors flex items-center gap-1.5 font-medium"
                         >
@@ -131,7 +141,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
     const finalDecision = useMemo(() => [...streamData].reverse().find(d => d.type === 'final_decision'), [streamData]);
     const hasBidding = useMemo(() => thoughts.some(t => t.node === 'bidding'), [thoughts]);
     const biddingThought = useMemo(() => thoughts.find(t => t.node === 'bidding'), [thoughts]);
-    
+
     let expectedNextAgent = null;
     let expectedNextPolicyAgent = null;
 
@@ -141,7 +151,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
         } else if (policyThoughts.length === 0 && !finalDecision) {
             const lastNode = dealThoughts[dealThoughts.length - 1].node;
             const lastIdx = AGENT_SEQUENCE.findIndex(a => a.node === lastNode);
-            
+
             if (lastNode === 'bidding') {
                 expectedNextAgent = AGENT_SEQUENCE[0];
             } else if (lastNode === 'judge') {
@@ -150,7 +160,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                 expectedNextAgent = AGENT_SEQUENCE[lastIdx + 1];
             }
         }
-        
+
         if (finalDecision && policyThoughts.length < POLICY_SEQUENCE.length) {
             expectedNextPolicyAgent = POLICY_SEQUENCE[policyThoughts.length];
         }
@@ -194,7 +204,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                         <div className="text-slate-300 text-sm font-mono tabular-nums flex flex-col gap-1.5 bg-slate-800/40 p-2.5 sm:p-3 rounded-lg border border-slate-700/30">
                                             <p className="flex justify-between"><span className="text-slate-500">Req:</span> <span className="truncate ml-2">{initialContext.request.quantity}x {initialContext.request.gpu_type} ({initialContext.request.duration_hours}h)</span></p>
                                             <p className="flex justify-between items-center">
-                                                <span className="text-slate-500">Type:</span> 
+                                                <span className="text-slate-500">Type:</span>
                                                 <span className={`px-2 py-0.5 rounded text-xs ${isSpot ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-primary-500/10 text-primary-400 border border-primary-500/20'}`}>
                                                     {initialContext.request.workload_type}
                                                 </span>
@@ -204,7 +214,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                                 <p className="flex justify-between items-center"><span className="text-slate-500">Bid:</span> <span className="text-yellow-400 font-bold">${initialContext.request.bid_price_per_hour.toFixed(2)}/hr</span></p>
                                             )}
                                             <p className="flex justify-between"><span className="text-slate-500">Avail:</span> <span>{initialContext.state.available_inventory}/{initialContext.state.total_inventory}</span></p>
-                                            
+
                                             <div className="mt-2 pt-2 border-t border-slate-700/30 flex items-center justify-between">
                                                 <span className="text-pink-400/70 text-xs flex items-center gap-1.5">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-pink-500" aria-hidden="true"></div>
@@ -217,14 +227,14 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                 })()}
                             </div>
                         )}
-                        
+
                         {dealThoughts.map((item, idx) => (
                             <div key={idx} className="flex flex-col ml-6 sm:ml-8 relative">
                                 <div className="absolute -left-[37px] sm:-left-[45px] top-6 border-2 border-slate-600 bg-slate-900 w-3.5 sm:w-4 h-3.5 sm:h-4 rounded-full z-10" aria-hidden="true"></div>
                                 <ThoughtCard item={item} />
                             </div>
                         ))}
-                        
+
                         {isThinking && expectedNextAgent && (
                             <div className="border border-slate-700/30 bg-slate-800/20 rounded-lg p-3 sm:p-4 animate-pulse ml-6 sm:ml-8 relative">
                                 <div className="absolute -left-[37px] sm:-left-[45px] top-6 border-2 border-primary-500/30 bg-slate-900 w-3.5 sm:w-4 h-3.5 sm:h-4 rounded-full z-10" aria-hidden="true"></div>
@@ -249,7 +259,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                 </h3>
                                 {(() => {
                                     const isSpot = initialContext?.request?.workload_type === 'Spot';
-                                    
+
                                     let actionLabel = finalDecision.decision.action;
                                     if (initialContext?.request?.workload_type === 'On-Demand' && finalDecision.decision.action === 'OVERRIDE') {
                                         actionLabel = 'MODIFIED';
@@ -263,17 +273,17 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                     return (
                                         <div className="text-sm space-y-1 tabular-nums">
                                             <p>
-                                                <span className="text-slate-400">Action:</span> 
+                                                <span className="text-slate-400">Action:</span>
                                                 <span className={`font-bold ml-2 ${textColor}`}>{actionLabel}</span>
                                             </p>
                                             <p>
                                                 <span className="text-slate-400">
-                                                    {finalDecision.decision.action === 'REJECT' && isSpot ? 'Rejected Bid:' : 
-                                                     finalDecision.decision.action === 'REJECT' ? 'Baseline:' : 'Price:'}
-                                                </span> 
+                                                    {finalDecision.decision.action === 'REJECT' && isSpot ? 'Rejected Bid:' :
+                                                        finalDecision.decision.action === 'REJECT' ? 'Baseline:' : 'Price:'}
+                                                </span>
                                                 <span className="text-white font-bold ml-2 font-mono">
-                                                    ${(finalDecision.decision.action === 'REJECT' && isSpot && initialContext?.request?.bid_price_per_hour 
-                                                        ? initialContext.request.bid_price_per_hour 
+                                                    ${(finalDecision.decision.action === 'REJECT' && isSpot && initialContext?.request?.bid_price_per_hour
+                                                        ? initialContext.request.bid_price_per_hour
                                                         : finalDecision.decision.final_price_per_hour).toFixed(2)}/hr
                                                 </span>
                                             </p>
@@ -282,7 +292,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                 })()}
                             </div>
                         )}
-                        
+
                         {finalDecision && hasBidding && biddingThought && !isThinking && (
                             <div className="bg-yellow-900/5 border border-yellow-500/20 rounded-lg p-3 sm:p-4 mt-2 animate-fade-in ml-6 sm:ml-8 relative">
                                 <div className="absolute -left-[37px] sm:-left-[45px] top-6 border-2 border-yellow-500 bg-slate-900 w-3.5 sm:w-4 h-3.5 sm:h-4 rounded-full z-10" aria-hidden="true"></div>
@@ -298,7 +308,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                 {(() => {
                                     const match = biddingThought.thought.content.match(/\[COUNTER_OFFER:\s*\$?([\d.]+)\]/);
                                     const recommendedPrice = match ? parseFloat(match[1]) : null;
-                                    
+
                                     const altV100Price = recommendedPrice ? (recommendedPrice * 0.45).toFixed(2) : '0.95';
                                     const altA100Price = recommendedPrice ? (recommendedPrice * 0.75).toFixed(2) : '1.45';
 
@@ -309,7 +319,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                                     <p className="text-xs text-slate-500 mb-0.5">Agent Strategy</p>
                                                     <p className="text-sm font-medium text-yellow-400">Match at <span className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded ml-1 tabular-nums">${recommendedPrice?.toFixed(2)}/hr</span></p>
                                                 </div>
-                                                <button 
+                                                <button
                                                     onClick={() => recommendedPrice && onExecuteCounterOffer(recommendedPrice)}
                                                     disabled={!recommendedPrice}
                                                     className="min-h-[36px] px-3 sm:px-4 py-1.5 sm:py-2 rounded border border-yellow-500/30 text-yellow-400 hover:bg-yellow-600 hover:text-white text-xs font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
@@ -323,20 +333,20 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                                     <p className="text-xs text-primary-400 mb-0.5">Pivot: V100</p>
                                                     <p className="text-sm text-slate-300"><span className="font-mono text-primary-400">V100</span> at <span className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded ml-1 tabular-nums">${altV100Price}/hr</span></p>
                                                 </div>
-                                                <button 
+                                                <button
                                                     onClick={() => onExecuteCounterOffer(parseFloat(altV100Price), 'V100')}
                                                     className="min-h-[36px] px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-primary-500/10 border border-primary-500/20 text-primary-400 hover:bg-primary-600 hover:text-white text-xs font-medium transition-colors whitespace-nowrap"
                                                 >
                                                     Pitch V100
                                                 </button>
                                             </div>
-                                            
+
                                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-slate-800/40 p-3 rounded-lg border border-slate-700/30 hover:border-primary-500/20 transition-colors">
                                                 <div className="min-w-0">
                                                     <p className="text-xs text-primary-400 mb-0.5">Pivot: A100</p>
                                                     <p className="text-sm text-slate-300"><span className="font-mono text-primary-400">A100</span> at <span className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded ml-1 tabular-nums">${altA100Price}/hr</span></p>
                                                 </div>
-                                                <button 
+                                                <button
                                                     onClick={() => onExecuteCounterOffer(parseFloat(altA100Price), 'A100')}
                                                     className="min-h-[36px] px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-primary-500/10 border border-primary-500/20 text-primary-400 hover:bg-primary-600 hover:text-white text-xs font-medium transition-colors whitespace-nowrap"
                                                 >
@@ -349,7 +359,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                                 <div className="flex gap-2 w-full">
                                                     <div className="relative flex-1">
                                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono" aria-hidden="true">$</span>
-                                                        <input 
+                                                        <input
                                                             id="custom-bid-price"
                                                             type="number"
                                                             step="0.01"
@@ -359,7 +369,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                                             className="w-full min-h-[40px] bg-slate-900 border border-slate-600 rounded-lg py-2 pl-7 pr-3 text-sm text-white font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50"
                                                         />
                                                     </div>
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
                                                             const val = parseFloat(customBidPrice);
                                                             if (!isNaN(val) && val > 0) {
@@ -391,7 +401,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                             <ThoughtCard item={item} />
                                         </div>
                                     ))}
-                                    
+
                                     {isThinking && expectedNextPolicyAgent && (
                                         <div className="border border-slate-700/30 border-dashed bg-slate-800/10 rounded-lg p-3 sm:p-4 animate-pulse relative">
                                             <div className="absolute -left-[37px] sm:-left-[45px] top-6 border-2 border-slate-600/40 bg-slate-900 w-3.5 sm:w-4 h-3.5 sm:h-4 rounded-full z-10" aria-hidden="true"></div>
@@ -462,7 +472,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                                         max={max}
                                                         step={step}
                                                         value={parse(replayPolicies[key])}
-                                                        onChange={e => setReplayPolicies(p => ({...p, [key]: update(e.target.value)}))}
+                                                        onChange={e => setReplayPolicies(p => ({ ...p, [key]: update(e.target.value) }))}
                                                         className="w-full h-2 bg-slate-700 rounded-lg cursor-pointer"
                                                     />
                                                 </div>
