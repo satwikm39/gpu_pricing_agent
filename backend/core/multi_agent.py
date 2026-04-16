@@ -48,13 +48,13 @@ async def generate_thought(agent_name: str, system_prompt: str, state: AgenticSt
 # --- NODES ---
 
 async def pricing_agent(state: AgenticState):
-    sys_prompt = """You are the **Pricing Base Agent**. 
+    sys_prompt = """You are the **Base Price Agent**. 
 Establish a raw baseline price using `GPU_State.depreciation_cost_per_hour` and `power_opex_per_hour` + 20% margin.
 Context:
 {context}
 
 OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence analysis. Use professional executive and financial terminology (e.g., OPEX, depreciation amortization, baseline margin thresholds)."""
-    return await generate_thought("Pricing Base Agent", sys_prompt, state)
+    return await generate_thought("Base Price Agent", sys_prompt, state)
 
 async def negative_agent(state: AgenticState):
     sys_prompt = """You are the **Conservative Risk Agent**.

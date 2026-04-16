@@ -10,7 +10,7 @@ This application tells a story of **"Glass-Box Transparency."** It transforms co
 ## 2. The Story: "Life of a Deal"
 Imagine an incoming request for **8x H100 GPUs** for a **24-hour training run**. Here is the journey that deal takes through our "Deal Desk":
 
-1.  **The Floor**: The **Pricing Base Agent** calculates the raw cost of electricity and hardware wear-and-tear to ensure we never lose money.
+1.  **The Floor**: The **Base Price Agent** calculates the raw cost of electricity and hardware wear-and-tear to ensure we never lose money.
 2.  **The Debate**: 
     - The **Conservative Agent** warns about margin erosion and low-priority users.
     - The **Opportunistic Agent** looks at the remaining 30% of our fleet and suggests a "scarcity premium" to win more revenue.
@@ -29,7 +29,7 @@ To make the decision-making process intuitive, each agent has a specific "voice"
 
 | Agent | Persona | Strategic Value |
 | :--- | :--- | :--- |
-| **Pricing Base** | *The Accountant* | Ensures CapEx/OpEx recovery and baseline margins. |
+| **Base Price** | *The Accountant* | Ensures CapEx/OpEx recovery and baseline margins. |
 | **Conservative** | *The Risk Manager* | Protects against price dumping and low-margin churn. |
 | **Opportunistic** | *The Revenue Optimizer* | Capitalizes on scarcity and hardware ROI lifecycle. |
 | **Market Monitor** | *The Competitive Intel* | Prevents us from pricing ourselves out of the market. |
@@ -46,7 +46,7 @@ The workflow captures the full lifecycle of a deal, from raw input to post-morte
 
 ```mermaid
 graph TD
-    START((Incoming Request)) --> P[Pricing Base Agent]
+    START((Incoming Request)) --> P[Base Price Agent]
     P --> N[Conservative Risk Agent]
     N --> PO[Opportunistic Agent]
     PO --> M[Market Monitor Agent]
