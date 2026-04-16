@@ -153,10 +153,19 @@ Context:
     decision: AgentDecision = await chain.ainvoke({"context": format_context(state)})
     
     # We also add the judge's summary as a thought so it streams to the UI nicely.
+    request = state["request"]
+    if decision.action != "REJECT":
+        price_str = f" at ${decision.final_price_per_hour}/hr."
+    else:
+        if request.workload_type == "Spot" and request.bid_price_per_hour is not None:
+            price_str = f" at ${request.bid_price_per_hour}/hr (bid price)."
+        else:
+            price_str = "."
+            
     thought = AgentThought(
         agent_name="Supreme Judge",
         content=(
-            f"Decision reached: {decision.action} at ${decision.final_price_per_hour}/hr.\n\n"
+            f"Decision reached: {decision.action}{price_str}\n\n"
             f"{decision.pros_cons}\n\n"
             f"**EXPLANATION:**\n{decision.explanation}"
         )
