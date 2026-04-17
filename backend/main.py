@@ -12,6 +12,7 @@ from core.models import LeaseRequest, GPUState
 from core.chatbot import ChatbotExtractor
 from core.calculator import ComputationLayer
 from core.agent import PolicyAgent
+from core.critic_agent import SandboxCriticAgent
 
 from simulator.chaos_monkey import ChaosMonkeySimulator
 from simulator.scenarios import SCENARIOS
@@ -68,6 +69,10 @@ class SettingsUpdate(BaseModel):
     eviction_delta: str
     post_roi_discount_floor: str
 
+class PolicyCritiquePayload(BaseModel):
+    old_policies: dict
+    new_policies: dict
+
 class EnvironmentUpdate(BaseModel):
     gpu_type: str
     depreciation_cost: float
@@ -122,6 +127,16 @@ async def update_settings(settings: SettingsUpdate, group_id: str = Query(defaul
         "post_roi_discount_floor": settings.post_roi_discount_floor
     }
     return {"status": "success", "new_settings": sim.policy_thresholds}
+
+@app.post("/api/policy_critique")
+async def get_policy_critique(payload: PolicyCritiquePayload):
+    """Evaluates the difference between old and new policies using the Critic Agent."""
+    critic = SandboxCriticAgent()
+    critique_markdown = await critic.evaluate_policy_change(
+        old_policies=payload.old_policies,
+        new_policies=payload.new_policies
+    )
+    return {"status": "success", "critique": critique_markdown}
 
 @app.post("/api/environment")
 async def update_environment(env: EnvironmentUpdate, group_id: str = Query(default="default")):
