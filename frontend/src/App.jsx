@@ -131,7 +131,10 @@ function App() {
                                     }
                                 } else if (event.type === 'thought') {
                                     if (!isSyncingRef.current) {
-                                        setAgentStreamData(prev => [...prev, event]);
+                                        setAgentStreamData(prev => {
+                                            if (prev.some(d => d.type === 'thought' && d.node === event.node)) return prev;
+                                            return [...prev, event];
+                                        });
                                     }
                                 } else if (event.type === 'tick_completed') {
                                     const t = event.tick;
@@ -329,7 +332,10 @@ function App() {
     isSyncingRef.current = true;
 
     await processStream(`/api/tick/stream?group_id=${GROUP_ID}`, {}, (data) => {
-        setAgentStreamData(prev => [...prev, data]);
+        setAgentStreamData(prev => {
+            if (data.type === 'thought' && prev.some(d => d.type === 'thought' && d.node === data.node)) return prev;
+            return [...prev, data];
+        });
         
         if (data.type === 'initial') {
             setLastDealContext({ request: data.request, state: data.state });
@@ -369,7 +375,10 @@ function App() {
             policy_overrides: policyOverrides
         })
     }, (data) => {
-        setAgentStreamData(prev => [...prev, data]);
+        setAgentStreamData(prev => {
+            if (data.type === 'thought' && prev.some(d => d.type === 'thought' && d.node === data.node)) return prev;
+            return [...prev, data];
+        });
         
         if (data.type === 'final_decision' && data.is_replay) {
             setAgentStreamData(current => {
@@ -409,7 +418,10 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request: modifiedRequest, state: modifiedState })
     }, (data) => {
-        setAgentStreamData(prev => [...prev, data]);
+        setAgentStreamData(prev => {
+            if (data.type === 'thought' && prev.some(d => d.type === 'thought' && d.node === data.node)) return prev;
+            return [...prev, data];
+        });
         
         if (data.type === 'initial') {
             setLastDealContext({ request: data.request, state: data.state });
@@ -435,7 +447,10 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request, state })
     }, (data) => {
-        setAgentStreamData(prev => [...prev, data]);
+        setAgentStreamData(prev => {
+            if (data.type === 'thought' && prev.some(d => d.type === 'thought' && d.node === data.node)) return prev;
+            return [...prev, data];
+        });
         
         if (data.type === 'initial') {
             setLastDealContext({ request: data.request, state: data.state });
