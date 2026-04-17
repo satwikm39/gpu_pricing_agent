@@ -17,6 +17,17 @@ load_dotenv()
 
 console = Console()
 
+GPU_SPEC_REGISTRY = {
+    "B200": {"depreciation": 3.00, "power": 1.50},
+    "H200": {"depreciation": 2.20, "power": 1.10},
+    "H100": {"depreciation": 1.80, "power": 0.90},
+    "A100": {"depreciation": 1.20, "power": 0.60},
+    "L40S": {"depreciation": 0.80, "power": 0.40},
+    "V100": {"depreciation": 0.60, "power": 0.30},
+    "RTX4090": {"depreciation": 1.00, "power": 0.50},  # 1.0 + 0.5 = 1.5 * 1.2 = 1.8
+    "T4": {"depreciation": 0.30, "power": 0.15}
+}
+
 class ChaosMonkeySimulator:
     def __init__(self, group_id: str = "default"):
         self.group_id = group_id
@@ -92,23 +103,26 @@ class ChaosMonkeySimulator:
             active_spot = int(total_inv * 0.2) if available < int(total_inv * 0.1) else int(total_inv * 0.05)
         
         # Simulate Live Market
-        gpu = random.choice(["B200", "H200", "H100", "A100", "L40S", "V100", "RTX4090", "T4"])
         if gpu == "H100" or gpu == "H200" or gpu == "B200":
-            base_market = random.uniform(2.50, 4.00)
+            base_market = random.uniform(5.50, 8.50)
         elif gpu == "A100":
-            base_market = random.uniform(1.20, 2.00)
+            base_market = random.uniform(3.00, 4.50)
+        elif gpu == "RTX4090":
+            base_market = random.uniform(2.00, 3.50)
         else:
-            base_market = random.uniform(0.80, 1.50)
+            base_market = random.uniform(0.80, 1.80)
             
         competitor = random.choice(["AWS", "Azure", "CoreWeave", "Lambda Labs"])
+        
+        specs = GPU_SPEC_REGISTRY.get(gpu, {"depreciation": 1.00, "power": 0.50})
         
         return GPUState(
             gpu_type=gpu,
             total_inventory=total_inv,
             available_inventory=available,
             active_spot_leases=active_spot,
-            depreciation_cost_per_hour=float(self.environment_settings["depreciation_cost"]),
-            power_opex_per_hour=float(self.environment_settings["power_opex"]),
+            depreciation_cost_per_hour=float(specs["depreciation"]),
+            power_opex_per_hour=float(specs["power"]),
             cost_recovered=random.choice([True, False]),
             market_price_per_hour=base_market,
             market_competitor_name=competitor

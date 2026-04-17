@@ -20,9 +20,14 @@ class AgenticState(TypedDict):
 llm = ChatOpenAI(model="gpt-4o", temperature=0.2, api_key=os.getenv("OPENAI_API_KEY"))
 
 def format_context(state: AgenticState) -> str:
+    gpu_state = state["gpu_state"]
+    raw_cost = gpu_state.depreciation_cost_per_hour + gpu_state.power_opex_per_hour
+    target_baseline = round(raw_cost * 1.2, 2)
+
     ctx = {
         "Request": state["request"].model_dump(),
-        "GPU_State": state["gpu_state"].model_dump(),
+        "GPU_State": gpu_state.model_dump(),
+        "Target_Baseline_Price": f"${target_baseline}/hr (includes 20% default margin)",
         "Policies": state["policy_thresholds"],
         "PreviousThoughts": [t.model_dump() for t in state.get("thoughts", [])]
     }
@@ -49,11 +54,21 @@ async def generate_thought(agent_name: str, system_prompt: str, state: AgenticSt
 
 async def pricing_agent(state: AgenticState):
     sys_prompt = """You are the **Base Price Agent**. 
-Establish a raw baseline price using `GPU_State.depreciation_cost_per_hour` and `power_opex_per_hour` + 20% margin.
+Your primary goal is to establish the baseline price for the current GPU request.
+
+GROUND TRUTH:
+The correct baseline price is provided in the context as `Target_Baseline_Price`. This value ALREADY includes the 20% default margin.
+
 Context:
 {context}
 
-OUTPUT INSTRUCTION: Provide a concise but detailed 3-4 sentence analysis. Use professional executive and financial terminology (e.g., OPEX, depreciation amortization, baseline margin thresholds)."""
+OUTPUT FORMAT REQUIREMENTS: 
+Start your response with a single-sentence executive summary stating the GPU type, the raw operational cost, and the final baseline price (which includes the 20% margin). DO NOT use numbered lists or bullet points for this first sentence.
+Then, start a new paragraph (separated by a double newline) and provide a 3-4 sentence detailed breakdown. In this breakdown, you must:
+- State the raw operational cost (depreciation + power).
+- Explicitly state that a 20% default margin is applied.
+- Report the final baseline price from `Target_Baseline_Price`.
+- Use professional executive and financial terminology (e.g., OPEX, depreciation amortization, baseline margin thresholds)."""
     return await generate_thought("Base Price Agent", sys_prompt, state)
 
 async def negative_agent(state: AgenticState):
