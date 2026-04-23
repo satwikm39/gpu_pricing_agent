@@ -129,7 +129,7 @@ SCENARIOS: list[dict] = [
     {
         "name": "Post-ROI Spot Discount",
         "description": "Hardware cost recovered — tests Policy D (lifecycle aggression).",
-        "expected_behavior": "REJECT — $0.90 bid is 50% below the $1.80 baseline. Conservative Agent enforces margin floor even with cost recovered.",
+        "expected_behavior": "APPROVE at $0.90 — cost is recovered so Policy D overrides Policy A's margin floor. Effective floor = max(base_price × (1 − post_roi_discount%), cost × 10%). At default 50% discount, floor ≈ $0.33, so $0.90 bid clears easily.",
         "gpu_state": GPUState(
             gpu_type="H200",
             total_inventory=1000,

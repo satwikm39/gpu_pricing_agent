@@ -8,6 +8,7 @@ from langgraph.graph import StateGraph, START, END
 
 from pydantic import BaseModel, Field
 from .models import LeaseRequest, GPUState, AgentDecision, AgentThought, MultiAgentTrace
+from .calculator import ComputationLayer
 
 class AgenticState(TypedDict):
     request: LeaseRequest
@@ -19,16 +20,71 @@ class AgenticState(TypedDict):
 # Setup the global LLM
 llm = ChatOpenAI(model="gpt-4o", temperature=0.2, api_key=os.getenv("OPENAI_API_KEY"))
 
+def _parse_policy_value(val_str: str) -> float:
+    """Parse policy threshold strings like '10%', '$1.50', '3.0x' into floats."""
+    s = str(val_str).strip()
+    if s.endswith('%'):
+        return float(s[:-1])
+    elif s.startswith('$'):
+        return float(s[1:])
+    elif s.endswith('x'):
+        return float(s[:-1])
+    else:
+        return float(s)
+
 def format_context(state: AgenticState) -> str:
     gpu_state = state["gpu_state"]
+    request = state["request"]
     raw_cost = gpu_state.depreciation_cost_per_hour + gpu_state.power_opex_per_hour
     target_baseline = round(raw_cost * 1.2, 2)
 
+    # Compute the base quote for accurate decision boundaries
+    calc = ComputationLayer()
+    quote = calc.calculate_quote(request, gpu_state)
+
+    # Parse policy thresholds into numeric values
+    policies = state["policy_thresholds"]
+    min_margin_pct = _parse_policy_value(policies.get("min_margin", "10"))
+    post_roi_floor_pct = _parse_policy_value(policies.get("post_roi_discount_floor", "50"))
+    max_premium_pct = _parse_policy_value(policies.get("max_market_premium", "20"))
+
+    # ── Compute decision boundaries ──────────────────────────────────────
+    margin_floor = round(raw_cost * (1 + min_margin_pct / 100.0), 2)
+    market_ceiling = round(gpu_state.market_price_per_hour * (1 + max_premium_pct / 100.0), 2)
+
+    boundaries = {
+        "Policy_A_Margin_Floor": f"${margin_floor}/hr — minimum price to protect {min_margin_pct}% margin over ${raw_cost}/hr cost",
+        "Policy_E_Market_Ceiling": f"${market_ceiling}/hr — max {max_premium_pct}% premium over {gpu_state.market_competitor_name}'s ${gpu_state.market_price_per_hour}/hr",
+        "Computed_Base_Price": f"${quote.base_price_per_hour}/hr (calculator output after discounts)",
+    }
+
+    # Policy D: When hardware cost is recovered AND request is Spot,
+    # the margin floor drops dramatically — compute the effective floor
+    if gpu_state.cost_recovered and request.workload_type == "Spot":
+        lifecycle_floor = round(quote.base_price_per_hour * (1 - post_roi_floor_pct / 100.0), 2)
+        effective_floor = round(max(lifecycle_floor, raw_cost * 0.1), 2)
+        boundaries["Policy_D_Post_ROI_Floor"] = (
+            f"${effective_floor}/hr — hardware is PAID OFF so Policy D OVERRIDES Policy A's "
+            f"${margin_floor}/hr margin floor. The effective minimum drops to ${effective_floor}/hr. "
+            f"Post-ROI discount allows up to {post_roi_floor_pct}% off base price."
+        )
+        if request.bid_price_per_hour is not None:
+            if request.bid_price_per_hour >= effective_floor:
+                boundaries["Policy_D_Verdict"] = (
+                    f"ACCEPT — Bid ${request.bid_price_per_hour}/hr >= post-ROI floor ${effective_floor}/hr. "
+                    f"This bid MUST be approved under Policy D."
+                )
+            else:
+                boundaries["Policy_D_Verdict"] = (
+                    f"REJECT — Bid ${request.bid_price_per_hour}/hr < post-ROI floor ${effective_floor}/hr."
+                )
+
     ctx = {
-        "Request": state["request"].model_dump(),
+        "Request": request.model_dump(),
         "GPU_State": gpu_state.model_dump(),
         "Target_Baseline_Price": f"${target_baseline}/hr (includes 20% default margin)",
-        "Policies": state["policy_thresholds"],
+        "Computed_Decision_Boundaries": boundaries,
+        "Policies": policies,
         "PreviousThoughts": [t.model_dump() for t in state.get("thoughts", [])]
     }
     return json.dumps(ctx, indent=2)
@@ -74,6 +130,12 @@ Then, start a new paragraph (separated by a double newline) and provide a 3-4 se
 async def negative_agent(state: AgenticState):
     sys_prompt = """You are the **Conservative Risk Agent**.
 Find reasons why we SHOULD NOT discount this deal or why we should reject. Focus on `min_margin`.
+
+CRITICAL EXCEPTION: If `Computed_Decision_Boundaries` contains `Policy_D_Post_ROI_Floor`, then the hardware cost is ALREADY RECOVERED.
+In this case, Policy A's margin floor is OVERRIDDEN by Policy D's lower floor. You MUST acknowledge this override
+in your analysis — you may still note the risk, but you CANNOT recommend rejection solely based on Policy A's
+margin floor when Policy D applies.
+
 Context:
 {context}
 
@@ -123,10 +185,21 @@ async def judge_agent(state: AgenticState):
 You have reviewed the thoughts from the Pricing, Conservative, Opportunistic, Market, and Capacity agents.
 Your job is to make the FINAL decision.
 
+## MANDATORY: USE COMPUTED DECISION BOUNDARIES
+The `Computed_Decision_Boundaries` field contains pre-calculated price floors and ceilings.
+You MUST use these exact values — do NOT re-derive or override them with your own math.
+
+### Policy D Override Rule (CRITICAL):
+If `Policy_D_Post_ROI_Floor` exists in `Computed_Decision_Boundaries`, then the hardware cost is RECOVERED
+and the margin floor from Policy A is REPLACED by Policy D's lower floor for Spot workloads.
+- If `Policy_D_Verdict` says "ACCEPT", you MUST approve the bid. The Conservative Agent's margin concerns
+  are overridden because depreciation is a sunk cost on paid-off hardware.
+- If `Policy_D_Verdict` says "REJECT", the bid is below even the post-ROI floor — reject it.
+
 ## ACTION MAPPING (follow strictly):
-- **APPROVE**: The deal is accepted at the calculated baseline price (cost + margin). Use when no policy adjustments are needed.
+- **APPROVE**: The deal is accepted at the bid price (for Spot) or baseline price (for On-Demand). Use when no policy adjustments are needed.
 - **OVERRIDE**: The deal is accepted but at a DIFFERENT price than baseline, due to market conditions, scarcity, or competitive pressure.
-- **REJECT**: The deal is fundamentally unacceptable (e.g., bid far below cost floor, unrecoverable margin loss).
+- **REJECT**: The deal is fundamentally unacceptable (e.g., bid below the applicable floor after all policy overrides).
 - **EVICT**: Inventory is at 0, but the deal is worth fulfilling — an existing spot lease MUST be terminated to free capacity. 
   **CRITICAL RULE: If `available_inventory` is 0 and you want to accept an On-Demand request, you MUST use EVICT, not APPROVE or OVERRIDE.** Set `target_eviction_id` to "SPOT-LOWEST" to indicate the lowest-value spot lease should be reclaimed.
 

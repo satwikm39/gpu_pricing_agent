@@ -10,10 +10,14 @@ class ComputationLayer:
     def __init__(self):
         # Base pricing per hour (fully amortized target price)
         self.BASE_RATES = {
+            "B200": 5.50,
+            "H200": 4.00,
             "H100": 3.50,
             "A100": 2.20,
             "L40S": 1.20,
-            "T4": 0.40
+            "V100": 1.10,
+            "RTX4090": 1.80,
+            "T4": 0.40,
         }
     
     def calculate_quote(self, request: LeaseRequest, gpu_state: GPUState) -> ComputedQuote:
