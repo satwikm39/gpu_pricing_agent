@@ -184,107 +184,185 @@ const LiveFeed = memo(({ data }) => {
                 )}
             </div>
 
-            {/* ── Decision Math (collapsible) ──────────────────────────────── */}
-            {boundaries && (
-                <div className="rounded-lg border border-slate-700/30 overflow-hidden">
-                    <button
-                        onClick={() => setMathOpen(!mathOpen)}
-                        className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-800/30 hover:bg-slate-800/50 transition-colors text-left min-h-[40px]"
-                        aria-expanded={mathOpen}
-                    >
-                        <span className="text-xs font-display font-semibold text-slate-400 flex items-center gap-2">
-                            <svg className="w-3.5 h-3.5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            {/* ── Decision Math — Visual Price Ruler ──────────────────── */}
+            {boundaries && (() => {
+                const actualMargin = displayPrice > 0 ? ((displayPrice - totalCost) / displayPrice * 100) : 0;
+                const effectiveFloor = boundaries.postRoiFloor != null ? boundaries.postRoiFloor : boundaries.marginFloor;
+                const hasPostRoi = boundaries.postRoiFloor != null;
+
+                // Determine ruling policy
+                let rulingPolicy, rulingLabel, rulingBadgeClass;
+                if (hasPostRoi) {
+                    rulingPolicy = 'D';
+                    rulingLabel = `Post-ROI Override (${boundaries.postRoiPct}% off)`;
+                    rulingBadgeClass = 'bg-emerald-500/15 text-emerald-400';
+                } else if (isReject) {
+                    rulingPolicy = 'A';
+                    rulingLabel = `Margin Floor (${boundaries.minMarginPct}%)`;
+                    rulingBadgeClass = 'bg-red-500/15 text-red-400';
+                } else {
+                    rulingPolicy = 'A';
+                    rulingLabel = `Margin Floor (${boundaries.minMarginPct}%)`;
+                    rulingBadgeClass = 'bg-blue-500/15 text-blue-400';
+                }
+
+                // Scale calc — build markers and compute positions
+                const markers = [
+                    { value: totalCost, label: 'Cost', color: 'red', position: 'below' },
+                    ...(hasPostRoi
+                        ? [{ value: boundaries.postRoiFloor, label: 'Post-ROI', color: 'emerald', position: 'above' }]
+                        : [{ value: boundaries.marginFloor, label: 'Floor', color: 'amber', position: 'above' }]
+                    ),
+                    { value: displayPrice, label: isSpot ? 'Bid' : 'Price', color: isApprove || isEvict ? 'green' : isReject ? 'red' : 'yellow', isFinal: true, position: 'above' },
+                    { value: state.market_price_per_hour, label: state.market_competitor_name || 'Mkt', color: 'pink', position: 'below' },
+                    { value: boundaries.marketCeiling, label: 'Ceiling', color: 'purple', position: 'below' },
+                ];
+                if (hasPostRoi) {
+                    markers.push({ value: boundaries.marginFloor, label: 'Floor', color: 'slate', strikethrough: true, position: 'below' });
+                }
+
+                const allValues = markers.map(m => m.value);
+                const scaleMax = Math.max(...allValues) * 1.12;
+                const scaleMin = 0;
+                const toPos = (v) => Math.min(Math.max(((v - scaleMin) / (scaleMax - scaleMin)) * 100, 3), 97);
+
+                const markerColors = {
+                    red: { dot: 'bg-red-400', text: 'text-red-400', line: 'bg-red-400/60' },
+                    amber: { dot: 'bg-amber-400', text: 'text-amber-400', line: 'bg-amber-400/60' },
+                    green: { dot: 'bg-green-400', text: 'text-green-400', line: 'bg-green-400/70' },
+                    yellow: { dot: 'bg-yellow-400', text: 'text-yellow-400', line: 'bg-yellow-400/70' },
+                    pink: { dot: 'bg-pink-400', text: 'text-pink-400', line: 'bg-pink-400/40' },
+                    purple: { dot: 'bg-purple-400', text: 'text-purple-400', line: 'bg-purple-400/40' },
+                    emerald: { dot: 'bg-emerald-400', text: 'text-emerald-400', line: 'bg-emerald-400/60' },
+                    slate: { dot: 'bg-slate-500', text: 'text-slate-500', line: 'bg-slate-500/40' },
+                };
+
+                const marginOk = actualMargin >= boundaries.minMarginPct || hasPostRoi;
+
+                return (
+                    <div className="rounded-lg border border-slate-700/30 bg-slate-900/40 overflow-hidden">
+                        {/* Header: clickable toggle — always visible */}
+                        <button
+                            onClick={() => setMathOpen(prev => !prev)}
+                            className="w-full flex items-center justify-between px-4 sm:px-5 py-2.5 hover:bg-slate-800/40 transition-colors text-left"
+                            aria-expanded={mathOpen}
+                        >
+                            <span className="text-xs font-display font-semibold text-slate-400 flex items-center gap-2">
+                                <svg className="w-3.5 h-3.5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                Price Breakdown
+                            </span>
+                            <svg className={`w-4 h-4 text-slate-500 transition-transform ${mathOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
-                            Decision Math
-                        </span>
-                        <svg className={`w-4 h-4 text-slate-500 transition-transform ${mathOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
+                        </button>
 
-                    {mathOpen && (
-                        <div className="px-4 py-3 bg-slate-900/40 border-t border-slate-700/30 flex flex-col gap-3 animate-fade-in">
-                            {/* Cost breakdown */}
-                            <div className="flex flex-col gap-1.5">
-                                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Cost Breakdown</span>
-                                <div className="grid grid-cols-3 gap-2 text-xs font-mono tabular-nums">
-                                    <div className="bg-slate-800/60 rounded px-2.5 py-2 border border-slate-700/30">
-                                        <span className="text-slate-500 block mb-0.5">Depreciation</span>
-                                        <span className="text-white">${state.depreciation_cost_per_hour.toFixed(2)}</span>
-                                    </div>
-                                    <div className="bg-slate-800/60 rounded px-2.5 py-2 border border-slate-700/30">
-                                        <span className="text-slate-500 block mb-0.5">Power OPEX</span>
-                                        <span className="text-white">${state.power_opex_per_hour.toFixed(2)}</span>
-                                    </div>
-                                    <div className="bg-slate-800/60 rounded px-2.5 py-2 border border-slate-700/30">
-                                        <span className="text-slate-500 block mb-0.5">Total Cost</span>
-                                        <span className="text-amber-400 font-semibold">${totalCost.toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            </div>
+                        {/* Collapsible body */}
+                        {mathOpen && (
+                        <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-1 animate-fade-in">
 
-                            {/* Policy floors & ceilings */}
-                            <div className="flex flex-col gap-1.5">
-                                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Active Policy Bounds</span>
-                                <div className="flex flex-col gap-1.5">
-                                    {/* Policy A — Margin Floor */}
-                                    <div className={`flex items-center justify-between px-3 py-2 rounded border text-xs font-mono tabular-nums ${
-                                        boundaries.postRoiFloor != null
-                                            ? 'bg-slate-800/30 border-slate-700/20 opacity-60 line-through decoration-slate-500/40'
-                                            : 'bg-slate-800/60 border-slate-700/30'
-                                    }`}>
-                                        <span className="flex items-center gap-2 text-slate-400">
-                                            <span className="bg-blue-500/15 text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-bold no-underline">A</span>
-                                            <span className="no-underline">Margin Floor ({boundaries.minMarginPct}%)</span>
-                                        </span>
-                                        <span className="text-white no-underline font-semibold">${boundaries.marginFloor.toFixed(2)}/hr</span>
-                                    </div>
+                        {/* Price Ruler */}
+                        <div className="relative mt-2 mb-8" style={{ height: '52px' }}>
+                            {/* Track */}
+                            <div className="absolute top-[24px] left-0 right-0 h-[3px] bg-slate-700/60 rounded-full" />
 
-                                    {/* Policy D — Post-ROI Floor (when applicable) */}
-                                    {boundaries.postRoiFloor != null && (
-                                        <div className={`flex flex-col gap-2 px-3 py-2.5 rounded border text-xs font-mono tabular-nums ${
-                                            boundaries.postRoiVerdict === 'ACCEPT'
-                                                ? 'bg-emerald-500/5 border-emerald-500/20'
-                                                : 'bg-red-500/5 border-red-500/20'
-                                        }`}>
-                                            <div className="flex items-center justify-between">
-                                                <span className="flex items-center gap-2 text-slate-300">
-                                                    <span className="bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded text-[10px] font-bold">D</span>
-                                                    Post-ROI Floor ({boundaries.postRoiPct}% off)
-                                                </span>
-                                                <span className="text-emerald-400 font-semibold">${boundaries.postRoiFloor.toFixed(2)}/hr</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-[11px] pl-6">
-                                                <span className="text-slate-500">
-                                                    = max(${boundaries.computedBasePrice.toFixed(2)} × {(1 - boundaries.postRoiPct / 100).toFixed(2)}, ${totalCost.toFixed(2)} × 0.10)
-                                                </span>
-                                            </div>
-                                            {request.bid_price_per_hour != null && (
-                                                <div className={`flex items-center gap-2 pl-6 text-[11px] font-semibold ${
-                                                    boundaries.postRoiVerdict === 'ACCEPT' ? 'text-emerald-400' : 'text-red-400'
-                                                }`}>
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${boundaries.postRoiVerdict === 'ACCEPT' ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
-                                                    Bid ${request.bid_price_per_hour.toFixed(2)} {boundaries.postRoiVerdict === 'ACCEPT' ? '≥' : '<'} floor ${boundaries.postRoiFloor.toFixed(2)} → {boundaries.postRoiVerdict}
+                            {/* Safe zone highlight (floor to ceiling) */}
+                            <div
+                                className="absolute top-[20px] h-[11px] rounded-full"
+                                style={{
+                                    left: `${toPos(effectiveFloor)}%`,
+                                    width: `${Math.max(toPos(boundaries.marketCeiling) - toPos(effectiveFloor), 1)}%`,
+                                    background: 'linear-gradient(90deg, rgba(52,211,153,0.08) 0%, rgba(52,211,153,0.15) 50%, rgba(52,211,153,0.08) 100%)',
+                                    borderTop: '1px solid rgba(52,211,153,0.15)',
+                                    borderBottom: '1px solid rgba(52,211,153,0.15)',
+                                }}
+                            />
+
+                            {/* Markers */}
+                            {markers.map((m, i) => {
+                                const pos = toPos(m.value);
+                                const colors = markerColors[m.color];
+                                const isAbove = m.position === 'above';
+
+                                return (
+                                    <div
+                                        key={i}
+                                        className="absolute flex flex-col items-center"
+                                        style={{ left: `${pos}%`, transform: 'translateX(-50%)' }}
+                                    >
+                                        {m.isFinal ? (
+                                            <>
+                                                <div className={`text-[10px] sm:text-[11px] font-mono font-bold tabular-nums whitespace-nowrap ${colors.text} mb-0.5`}>
+                                                    ${m.value.toFixed(2)}
                                                 </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Policy E — Market Ceiling */}
-                                    <div className="flex items-center justify-between px-3 py-2 rounded bg-slate-800/60 border border-slate-700/30 text-xs font-mono tabular-nums">
-                                        <span className="flex items-center gap-2 text-slate-400">
-                                            <span className="bg-pink-500/15 text-pink-400 px-1.5 py-0.5 rounded text-[10px] font-bold">E</span>
-                                            Market Ceiling ({boundaries.maxPremiumPct}%)
-                                        </span>
-                                        <span className="text-white font-semibold">${boundaries.marketCeiling.toFixed(2)}/hr</span>
+                                                {/* Triangle marker */}
+                                                <div
+                                                    className="w-0 h-0 mb-px"
+                                                    style={{
+                                                        borderLeft: '5px solid transparent',
+                                                        borderRight: '5px solid transparent',
+                                                        borderTop: `7px solid ${m.color === 'green' ? '#4ade80' : m.color === 'red' ? '#f87171' : '#facc15'}`,
+                                                    }}
+                                                />
+                                                <div className={`w-px h-[6px] ${colors.line}`} />
+                                                <div className={`text-[9px] ${colors.text} mt-0.5 font-medium whitespace-nowrap`}>
+                                                    {m.label}
+                                                </div>
+                                            </>
+                                        ) : isAbove ? (
+                                            <>
+                                                <div className={`text-[9px] sm:text-[10px] font-mono tabular-nums whitespace-nowrap ${colors.text} ${m.strikethrough ? 'line-through opacity-50' : ''}`}>
+                                                    ${m.value.toFixed(2)}
+                                                </div>
+                                                <div className={`w-px h-[8px] ${colors.line}`} />
+                                                <div className={`w-[7px] h-[7px] rounded-full ${colors.dot} ${m.strikethrough ? 'opacity-40' : ''}`} />
+                                                <div className={`text-[8px] sm:text-[9px] ${colors.text} mt-0.5 whitespace-nowrap ${m.strikethrough ? 'line-through opacity-40' : ''}`}>
+                                                    {m.label}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className={`text-[8px] sm:text-[9px] ${colors.text} mb-0.5 whitespace-nowrap ${m.strikethrough ? 'line-through opacity-40' : ''}`}>
+                                                    {m.label}
+                                                </div>
+                                                <div className={`w-[7px] h-[7px] rounded-full ${colors.dot} ${m.strikethrough ? 'opacity-40' : ''}`} />
+                                                <div className={`w-px h-[8px] ${colors.line}`} />
+                                                <div className={`text-[9px] sm:text-[10px] font-mono tabular-nums whitespace-nowrap ${colors.text} ${m.strikethrough ? 'line-through opacity-50' : ''}`}>
+                                                    ${m.value.toFixed(2)}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
-                                </div>
-                            </div>
+                                );
+                            })}
                         </div>
-                    )}
-                </div>
-            )}
+
+                        {/* Cost equation + Post-ROI note */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
+                            <div className="flex items-center gap-1.5 text-xs font-mono tabular-nums text-slate-500">
+                                <span>Dep <span className="text-slate-400">${state.depreciation_cost_per_hour.toFixed(2)}</span></span>
+                                <span className="text-slate-600">+</span>
+                                <span>Pwr <span className="text-slate-400">${state.power_opex_per_hour.toFixed(2)}</span></span>
+                                <span className="text-slate-600">=</span>
+                                <span className="text-amber-400 font-semibold">${totalCost.toFixed(2)}</span>
+                            </div>
+
+                            {hasPostRoi && request.bid_price_per_hour != null && (
+                                <span className={`text-[11px] font-mono font-semibold flex items-center gap-1.5 ${
+                                    boundaries.postRoiVerdict === 'ACCEPT' ? 'text-emerald-400' : 'text-red-400'
+                                }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${boundaries.postRoiVerdict === 'ACCEPT' ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                                    Bid ${request.bid_price_per_hour.toFixed(2)} {boundaries.postRoiVerdict === 'ACCEPT' ? '≥' : '<'} floor ${boundaries.postRoiFloor.toFixed(2)}
+                                </span>
+                            )}
+                        </div>
+
+                        </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             <div className="bg-slate-800/40 p-4 sm:p-5 rounded-lg border border-slate-700/30 relative overflow-hidden group hover:border-accent-500/15 transition-colors">
                 <p className="text-accent-400 font-display font-semibold text-xs mb-2 sm:mb-3">Explanation</p>
