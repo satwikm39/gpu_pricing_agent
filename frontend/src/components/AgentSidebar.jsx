@@ -1,5 +1,10 @@
 import React, { useRef, useState, memo, useMemo } from 'react';
 
+const BASE_RATES = {
+    B200: 5.50, H200: 4.00, H100: 3.50, A100: 2.20,
+    L40S: 1.20, V100: 1.10, RTX4090: 1.80, T4: 0.40,
+};
+
 const AGENT_SEQUENCE = [
     { node: 'pricing', name: 'Base Price Agent', icon: '💰' },
     { node: 'negative', name: 'Conservative Risk Agent', icon: '🛡️' },
@@ -134,7 +139,7 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
     });
 
     const thoughts = useMemo(() => streamData.filter(d => d.type === 'thought'), [streamData]);
-    const dealThoughts = useMemo(() => thoughts.filter(t => !['analyst', 'critique'].includes(t.node)), [thoughts]);
+    const dealThoughts = useMemo(() => thoughts.filter(t => !['analyst', 'critique', 'bidding'].includes(t.node)), [thoughts]);
     const policyThoughts = useMemo(() => thoughts.filter(t => ['analyst', 'critique'].includes(t.node)), [thoughts]);
 
     const initialContext = useMemo(() => streamData.find(d => d.type === 'initial'), [streamData]);
@@ -198,8 +203,12 @@ const AgentSidebar = memo(({ streamData, isThinking, lastDealContext, onReplay, 
                                     Incoming Deal
                                 </h3>
                                 {(() => {
-                                    const basePrice = (initialContext.state.depreciation_cost_per_hour + initialContext.state.power_opex_per_hour) * 1.20;
                                     const isSpot = initialContext.request.workload_type === 'Spot';
+                                    const baseRate = BASE_RATES[initialContext.request.gpu_type] || 1.00;
+                                    const spotDisc = isSpot ? 0.60 : 0.0;
+                                    const volDisc = initialContext.request.quantity > 50 ? 0.05 : 0.0;
+                                    const durDisc = initialContext.request.duration_hours > 720 ? 0.10 : 0.0;
+                                    const basePrice = baseRate * (1 - Math.min(spotDisc + volDisc + durDisc, 0.80));
                                     return (
                                         <div className="text-slate-300 text-sm font-mono tabular-nums flex flex-col gap-1.5 bg-slate-800/40 p-2.5 sm:p-3 rounded-lg border border-slate-700/30">
                                             <p className="flex justify-between"><span className="text-slate-500">Req:</span> <span className="truncate ml-2">{initialContext.request.quantity}x {initialContext.request.gpu_type} ({initialContext.request.duration_hours}h)</span></p>

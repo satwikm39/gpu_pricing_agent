@@ -36,7 +36,6 @@ def format_context(state: AgenticState) -> str:
     gpu_state = state["gpu_state"]
     request = state["request"]
     raw_cost = gpu_state.depreciation_cost_per_hour + gpu_state.power_opex_per_hour
-    target_baseline = round(raw_cost * 1.2, 2)
 
     # Compute the base quote for accurate decision boundaries
     calc = ComputationLayer()
@@ -53,9 +52,10 @@ def format_context(state: AgenticState) -> str:
     market_ceiling = round(gpu_state.market_price_per_hour * (1 + max_premium_pct / 100.0), 2)
 
     boundaries = {
+        "Operational_Cost": f"${raw_cost}/hr (depreciation ${gpu_state.depreciation_cost_per_hour} + power ${gpu_state.power_opex_per_hour})",
+        "Computed_Base_Price": f"${quote.base_price_per_hour}/hr (market rate ${quote.base_rate} after {request.workload_type} discounts)",
         "Policy_A_Margin_Floor": f"${margin_floor}/hr — minimum price to protect {min_margin_pct}% margin over ${raw_cost}/hr cost",
         "Policy_E_Market_Ceiling": f"${market_ceiling}/hr — max {max_premium_pct}% premium over {gpu_state.market_competitor_name}'s ${gpu_state.market_price_per_hour}/hr",
-        "Computed_Base_Price": f"${quote.base_price_per_hour}/hr (calculator output after discounts)",
     }
 
     # Policy D: When hardware cost is recovered AND request is Spot,
@@ -82,7 +82,6 @@ def format_context(state: AgenticState) -> str:
     ctx = {
         "Request": request.model_dump(),
         "GPU_State": gpu_state.model_dump(),
-        "Target_Baseline_Price": f"${target_baseline}/hr (includes 20% default margin)",
         "Computed_Decision_Boundaries": boundaries,
         "Policies": policies,
         "PreviousThoughts": [t.model_dump() for t in state.get("thoughts", [])]
@@ -113,17 +112,19 @@ async def pricing_agent(state: AgenticState):
 Your primary goal is to establish the baseline price for the current GPU request.
 
 GROUND TRUTH:
-The correct baseline price is provided in the context as `Target_Baseline_Price`. This value ALREADY includes the 20% default margin.
+The correct baseline price is provided in `Computed_Decision_Boundaries.Computed_Base_Price`.
+The minimum acceptable price (margin floor) is in `Computed_Decision_Boundaries.Policy_A_Margin_Floor`.
+You MUST use these exact values — do NOT calculate your own.
 
 Context:
 {context}
 
 OUTPUT FORMAT REQUIREMENTS: 
-Start your response with a single-sentence executive summary stating the GPU type, the raw operational cost, and the final baseline price (which includes the 20% margin). DO NOT use numbered lists or bullet points for this first sentence.
+Start your response with a single-sentence executive summary stating the GPU type, the raw operational cost (from `Operational_Cost`), and the computed base price (from `Computed_Base_Price`). DO NOT use numbered lists or bullet points for this first sentence.
 Then, start a new paragraph (separated by a double newline) and provide a 3-4 sentence detailed breakdown. In this breakdown, you must:
-- State the raw operational cost (depreciation + power).
-- Explicitly state that a 20% default margin is applied.
-- Report the final baseline price from `Target_Baseline_Price`.
+- State the raw operational cost (depreciation + power) from `Operational_Cost`.
+- State the computed base price from `Computed_Base_Price`.
+- State the margin floor from `Policy_A_Margin_Floor` and the configured min_margin percentage.
 - Use professional executive and financial terminology (e.g., OPEX, depreciation amortization, baseline margin thresholds)."""
     return await generate_thought("Base Price Agent", sys_prompt, state)
 

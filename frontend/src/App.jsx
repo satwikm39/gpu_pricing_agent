@@ -131,7 +131,16 @@ function App() {
                                     }
                                 } else if (event.type === 'thought') {
                                     if (!isSyncingRef.current) {
-                                        setAgentStreamData(prev => [...prev, event]);
+                                        setAgentStreamData(prev => {
+                                            const isDuplicate = prev.some(d =>
+                                                d.type === 'thought' &&
+                                                d.node === event.node &&
+                                                d.thought?.agent_name === event.thought?.agent_name &&
+                                                d.thought?.content === event.thought?.content
+                                            );
+                                            if (isDuplicate) return prev;
+                                            return [...prev, event];
+                                        });
                                     }
                                 } else if (event.type === 'tick_completed') {
                                     const t = event.tick;
@@ -155,6 +164,7 @@ function App() {
                                           state: t.state,
                                           decision: t.decision,
                                           metrics: t.metrics,
+                                          policies: t.initial?.policies || null,
                                           _serverId: t.id,
                                       }, ...prev];
                                       return next.slice(0, MAX_FEED_ITEMS);
@@ -192,6 +202,7 @@ function App() {
                           state: t.state,
                           decision: t.decision,
                           metrics: t.metrics,
+                          policies: t.initial?.policies || null,
                           _serverId: t.id,
                           thoughts: t.thoughts || []
                       })).reverse().slice(0, MAX_FEED_ITEMS));
