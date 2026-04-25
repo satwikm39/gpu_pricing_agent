@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { POLICY_DATA } from '../shared/policyData';
 
-const WarGamesPanel = ({ savedRuns, onClearRuns, onSaveRun, canSave, isAutoRunning, onRunScenario }) => {
+const WarGamesPanel = ({ savedRuns, onClearRuns, onRunScenario }) => {
     const [scenarios, setScenarios] = useState([]);
     const [loadError, setLoadError] = useState(false);
 

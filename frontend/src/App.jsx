@@ -87,7 +87,6 @@ function App() {
   const [comparisonOpen, setComparisonOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [isThinking, setIsThinking] = useState(false)
-  const [isAutoRunning, setIsAutoRunning] = useState(false)
   const [adminData, setAdminData] = useState(null)
 
   const originalDecisionRef = useRef(null) 
@@ -461,17 +460,6 @@ function App() {
     isSyncingRef.current = false;
   }, [loading, isThinking]);
 
-  useEffect(() => {
-    let interval;
-    if (isAutoRunning && activeTab === 'simulation' && !loading && !isThinking) {
-        interval = setInterval(() => {
-            runTickStream()
-        }, 5000) 
-    }
-    return () => clearInterval(interval)
-  }, [isAutoRunning, activeTab, loading, isThinking, runTickStream])
-
-
   const saveCurrentRun = async () => {
       if (feed.length === 0) return;
       const runName = `Run ${savedRuns.length + 1} (${feed.length} Ticks)`;
@@ -578,10 +566,10 @@ function App() {
                 <div className="panel p-3 sm:p-4 flex flex-wrap items-center gap-2 sm:gap-3">
                     <button 
                         onClick={runTickStream}
-                        disabled={loading || isAutoRunning}
+                        disabled={loading}
                         className="min-h-[44px] px-4 py-2.5 sm:px-6 sm:py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
                     >
-                        {loading && !isAutoRunning ? (
+                        {loading ? (
                             <>
                                 <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -598,32 +586,10 @@ function App() {
                             </>
                         )}
                     </button>
-                    <button 
-                        onClick={() => setIsAutoRunning(!isAutoRunning)}
-                        aria-pressed={isAutoRunning}
-                        className={`min-h-[44px] px-4 py-2.5 sm:px-6 sm:py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${isAutoRunning ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
-                    >
-                        {isAutoRunning ? (
-                            <>
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span className="hidden sm:inline">Stop Auto</span>
-                            </>
-                        ) : (
-                            <>
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span className="hidden sm:inline">Auto Run</span>
-                            </>
-                        )}
-                    </button>
                     <div className="w-px h-8 bg-slate-700 mx-1 self-center hidden sm:block" aria-hidden="true"></div>
                     <button 
                         onClick={saveCurrentRun}
-                        disabled={feed.length === 0 || isAutoRunning}
+                        disabled={feed.length === 0}
                         className="min-h-[44px] px-4 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <svg className="w-5 h-5 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -684,8 +650,7 @@ function App() {
                   savedRuns={savedRuns}
                   onClearRuns={() => setSavedRuns([])}
                   onSaveRun={saveCurrentRun}
-                  canSave={feed.length > 0 && !isAutoRunning}
-                  isAutoRunning={isAutoRunning}
+                  canSave={feed.length > 0}
                   onRunScenario={handleRunScenario}
               />
             </Suspense>

@@ -197,10 +197,14 @@ and the margin floor from Policy A is REPLACED by Policy D's lower floor for Spo
   are overridden because depreciation is a sunk cost on paid-off hardware.
 - If `Policy_D_Verdict` says "REJECT", the bid is below even the post-ROI floor — reject it.
 
+## TERMINOLOGY (strictly follow):
+- **On-Demand requests do NOT have a bid price.** They have a "computed base price" (from `Computed_Base_Price` in boundaries). NEVER use the phrase "bid price" for On-Demand requests.
+- **Spot requests** have a "bid price" submitted by the customer (from `request.bid_price_per_hour`).
+
 ## ACTION MAPPING (follow strictly):
-- **APPROVE**: The deal is accepted at the bid price (for Spot) or baseline price (for On-Demand). Use when no policy adjustments are needed.
-- **OVERRIDE**: The deal is accepted but at a DIFFERENT price than baseline, due to market conditions, scarcity, or competitive pressure.
-- **REJECT**: The deal is fundamentally unacceptable (e.g., bid below the applicable floor after all policy overrides).
+- **APPROVE**: The deal is accepted at the computed base price (On-Demand) or the customer's bid price (Spot). Use when no policy adjustments are needed and the price already meets or exceeds all policy floors.
+- **OVERRIDE**: The deal is accepted but at a DIFFERENT price than the computed base price. Use when the base price falls below a policy floor (e.g. margin floor), so the price must be raised to meet policy requirements.
+- **REJECT**: The deal is fundamentally unacceptable (e.g., a Spot bid below the applicable floor after all policy overrides).
 - **EVICT**: Inventory is at 0, but the deal is worth fulfilling — an existing spot lease MUST be terminated to free capacity. 
   **CRITICAL RULE: If `available_inventory` is 0 and you want to accept an On-Demand request, you MUST use EVICT, not APPROVE or OVERRIDE.** Set `target_eviction_id` to "SPOT-LOWEST" to indicate the lowest-value spot lease should be reclaimed.
 
