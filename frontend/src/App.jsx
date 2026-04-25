@@ -338,7 +338,7 @@ function App() {
     originalDecisionRef.current = null;
     isSyncingRef.current = true;
 
-    await processStream(`/api/tick/stream?group_id=${GROUP_ID}`, {}, (data) => {
+    await processStream(`/api/v2/tick/stream?group_id=${GROUP_ID}`, {}, (data) => {
         setAgentStreamData(prev => [...prev, data]);
         
         if (data.type === 'initial') {
@@ -370,7 +370,7 @@ function App() {
   const handleReplay = useCallback(async (policyOverrides) => {
     if (!lastDealContext || loading || isThinking) return;
 
-    await processStream(`/api/tick/replay?group_id=${GROUP_ID}`, {
+    await processStream(`/api/v2/tick/replay?group_id=${GROUP_ID}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -414,7 +414,7 @@ function App() {
     
     isSyncingRef.current = true;
 
-    await processStream(`/api/tick/execute?group_id=${GROUP_ID}`, {
+    await processStream(`/api/v2/tick/execute?group_id=${GROUP_ID}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request: modifiedRequest, state: modifiedState })
@@ -440,7 +440,7 @@ function App() {
     isSyncingRef.current = true;
     setActiveTab('simulation');
 
-    await processStream(`/api/tick/execute?group_id=${GROUP_ID}`, {
+    await processStream(`/api/v2/tick/execute?group_id=${GROUP_ID}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request, state })

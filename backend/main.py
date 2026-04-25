@@ -169,7 +169,7 @@ class ReplayPayload(BaseModel):
     state: GPUState
     policy_overrides: Optional[Dict[str, Any]] = None
 
-@app.post("/api/tick/replay")
+@app.post("/api/v2/tick/replay")
 async def replay_tick_stream(payload: ReplayPayload, group_id: str = Query(default="default")):
     """
     Replays a specific frozen request+state through the multi-agent graph
@@ -188,7 +188,7 @@ async def replay_tick_stream(payload: ReplayPayload, group_id: str = Query(defau
     return EventSourceResponse(sse_generator())
 
 
-@app.post("/api/tick/execute")
+@app.post("/api/v2/tick/execute")
 async def execute_tick_stream(payload: ReplayPayload, group_id: str = Query(default="default")):
     """
     Executes a specific request+state through the multi-agent graph,
@@ -219,7 +219,7 @@ async def get_active_tick(group_id: str = Query(default="default")):
     """Returns the in-progress simulation tick for the group, if any."""
     return get_simulator(group_id).active_tick
 
-@app.get("/api/tick/stream")
+@app.get("/api/v2/tick/stream")
 async def run_tick_stream(group_id: str = Query(default="default")):
     """Executes one tick of the simulation and streams the multi-agent thought process."""
     sim = get_simulator(group_id)
